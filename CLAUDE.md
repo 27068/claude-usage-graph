@@ -30,18 +30,17 @@ reporting it missing or offering to install it.
 The webview is an esbuild bundle. Editing `src/webview/client/*.ts` changes
 nothing on screen until `media/dashboard.js` is regenerated:
 
-- After touching `src/webview/`, run **`npm run compile`** (not `npm run watch` —
-  it never rebuilds the bundle).
-- Never edit `media/dashboard.js` directly. It is generated and gitignored.
-- Then confirm it landed by grepping the minified bundle for the shape of it —
-  section 6 — before editing the source a second time. Minification strips
-  comments, so a comment-only edit is not greppable and compiling is the check.
+- After touching `src/webview/`, run **`npm run compile`** — not `npm run watch`,
+  which never rebuilds the bundle. Never edit `media/dashboard.js`: generated,
+  gitignored.
+- Confirm it landed by grepping the minified bundle for the shape of it (section
+  6) before editing the source a second time. Minification strips comments, so a
+  comment-only edit is not greppable and compiling is the check.
 - Do not assume F5, and do not assume this is webview-only. **Any** `src/` edit,
-  host code included, reaches the screen through the copy in
-  `~/.vscode/extensions/`, which a repo-local `npm run compile` does not touch —
-  verify against that copy, not `out/` (section 5). `npm run package` writes a
-  vsix and installs nothing: package, install `--force`, re-check. A stale
-  install looks exactly like a change that failed.
+  host code included, reaches the screen through `~/.vscode/extensions/`, which a
+  repo-local compile does not touch — verify against that copy, never `out/`.
+  Section 5 has the package-install-reload sequence; skipping any of it leaves a
+  stale install, which looks exactly like a change that failed.
 - The user must reload the window to see it. Say so.
 
 ## Verify before claiming
@@ -51,6 +50,30 @@ nothing on screen until `media/dashboard.js` is regenerated:
 - `npm run package` builds the vsix and runs the full compile first.
 - Report what the command actually printed. A visual change you have not seen
   rendered is "built and verified in the bundle", not "confirmed working".
+
+## Committing
+
+Finishing a unit of work — one bug, one feature, anything with a clean seam
+around it — includes committing it. Do it in the same turn, without being asked,
+and only once the section above has actually passed: commit what you have run,
+not what you have typed.
+
+Work lands on `dev`. `main` is what has been released and moves only at a
+release — `docs/DEVELOPING.md` section 11. So every commit you write is on a
+branch that is safe to rewrite, and every commit on `main` is one that is not.
+
+- **Never push `main`.** Pushing `dev` is backup and needs no asking; `main` is
+  the user's call, at a release, every time.
+- **Amend the commit it belongs to, which is often not the last one.** A fix or
+  a doc update for bug 1 goes into bug 1's commit even with bug 2 sitting on top
+  of it. What decides the commit is which unit the change serves, never which is
+  most recent; only a change that opens a new unit earns a new commit. History
+  should read as one commit per unit of work, not as the route you took to it.
+- Reaching back is `git commit --fixup=<sha>` then `git rebase --autosquash
+  <sha>~1`. No `-i`: autosquash needs none, which matters because the Bash tool
+  refuses interactive rebase. On `dev` this costs nothing, which is what the
+  branch is for — expect to need it, because "finished" is a judgement that is
+  sometimes wrong and the discovery usually arrives after the commit.
 
 ## Repo conventions
 
@@ -99,10 +122,11 @@ first*, audience second:
 Keep committed files true of a fresh clone anywhere. When a rule needs a local
 detail to act on, state the portable half here and let the import supply the rest.
 
-**Budget.** Keep `CLAUDE.md` under ~120 lines; it loads every session and every
-line is paid for repeatedly. Prefer rewriting an existing line over adding one
-beside it. A section that grows past a screen moves to `docs/DEVELOPING.md` and
-leaves a one-line pointer.
+**Budget.** Every line here loads each session and is paid for repeatedly, so
+keep it tight — but the line count is a prompt to compress, never a reason to
+drop something worth knowing. Rewrite a line rather than adding one beside it,
+and move mechanism to `docs/DEVELOPING.md` behind a pointer. Once what remains
+all earns its place, raise the target instead of cutting to meet it. ~150 today.
 
 **Evict in the same pass.** Before relying on anything written here, check it is
 still true — the file, flag or script still exists. If it is wrong, correct or

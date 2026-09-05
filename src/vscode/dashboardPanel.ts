@@ -25,6 +25,8 @@ export const VIEW_TYPE = 'claudeUsageGraph.dashboard';
 
 export interface PanelDependencies {
   extensionUri: vscode.Uri;
+  /** The extension's own version, forwarded to the panel as its build identity. */
+  version: string;
   updates: IEventBus<LedgerUpdatedEvent>;
   statuses: IEventBus<StatusEvent>;
   cache: LedgerCache;
@@ -185,7 +187,7 @@ export class DashboardPanel {
       live,
       oldest,
       meta,
-      config: { hiddenSeries: hiddenSeries() },
+      config: { hiddenSeries: hiddenSeries(), version: this.dependencies.version },
     });
 
     if (status !== undefined) {
