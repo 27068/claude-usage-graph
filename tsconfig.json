@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "outDir": "out",
+    "rootDir": "src",
+
+    // TypeScript 7 defaults this to an empty array instead of auto-including
+    // every @types package, so ambient globals must be listed explicitly.
+    "types": ["node", "mocha", "vscode"],
+
+    "sourceMap": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+
+  // The webview client targets the browser (DOM lib, ES modules); it is
+  // type-checked by tsconfig.webview.json and bundled by esbuild.
+  "exclude": ["node_modules", ".vscode-test", "src/webview/client"]
+}

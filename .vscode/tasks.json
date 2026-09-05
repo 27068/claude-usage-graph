@@ -1,0 +1,71 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "compile",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "label": "npm: compile"
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "label": "npm: watch"
+    },
+    {
+      // The fixture is anchored to the clock at generation time and goes stale
+      // within hours, so it is worth one click rather than a remembered command.
+      "type": "npm",
+      "script": "fixture:screenshot",
+      "problemMatcher": [],
+      "label": "npm: fixture:screenshot",
+      "detail": "Regenerate fixtures/screenshot-usage.json against the current clock"
+    },
+    {
+      // Wipes the screenshot ledger, then regenerates the fixture. The wipe is
+      // not housekeeping: each generation is anchored to a different NOW, and a
+      // ledger that survives between launches layers them into data no real
+      // account could report — overlapping weekly cycles, reset walls stranded
+      // mid-line. `scripts/reset-dev-ledger.mjs` explains it in full.
+      "type": "npm",
+      "script": "screenshot:prepare",
+      "problemMatcher": [],
+      "label": "npm: screenshot:prepare",
+      "detail": "Clear the screenshot ledger and regenerate its fixture"
+    },
+    {
+      // Same wipe for the manual-testing host. It has no fixture to regenerate
+      // — the initial launch replays the committed `mock-usage.json` — but that
+      // file is anchored to local midnight of the previous day, so launching on
+      // two different days lays down two weekly cycles a day apart.
+      "type": "npm",
+      "script": "testhost:prepare",
+      "problemMatcher": [],
+      "label": "npm: testhost:prepare",
+      "detail": "Clear the test-scenario host's ledger"
+    },
+    {
+      // preLaunchTask for "Run Extension (screenshot data)". A launch config
+      // takes exactly one, so the two steps are chained here instead. Sequence,
+      // not parallel: nothing about compiling depends on the fixture, but a
+      // failure in either should stop the launch rather than race it.
+      "label": "screenshot: fresh data",
+      "dependsOrder": "sequence",
+      "dependsOn": ["npm: screenshot:prepare", "npm: compile"],
+      "problemMatcher": [],
+      "detail": "Clear the ledger, regenerate the screenshot fixture, then compile"
+    },
+    {
+      // preLaunchTask for "Run Extension (test scenarios)", for the same reason.
+      "label": "test scenarios: fresh ledger",
+      "dependsOrder": "sequence",
+      "dependsOn": ["npm: testhost:prepare", "npm: compile"],
+      "problemMatcher": [],
+      "detail": "Clear the test host's ledger, then compile"
+    }
+  ]
+}

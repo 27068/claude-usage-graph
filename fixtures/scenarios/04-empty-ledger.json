@@ -1,0 +1,14 @@
+{
+  "name": "Nothing recorded",
+  "description": "Every window reports null, so no ledger file is written. The only case where both graphs should show their placeholder text.",
+  "nowMin": 2100,
+  "frames": [
+    {
+      "atMin": 2100,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": null,
+      "sevenResetMin": null
+    }
+  ]
+}

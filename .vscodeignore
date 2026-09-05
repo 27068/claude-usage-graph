@@ -1,0 +1,26 @@
+.vscode/**
+.git/**
+src/**
+out/test/**
+out/**/*.map
+tsconfig.json
+tsconfig.webview.json
+.mocharc.json
+.gitignore
+.vscodeignore
+.node-version
+Requirements.md
+docs/**
+scripts/**
+CLAUDE.md
+fixtures/screenshot-usage.json
+fixtures/scenarios/**
+
+# Local ledgers written by the two dev launch configurations (CUG_STORAGE_ROOT).
+# These are gitignored, but vsce ignores .gitignore entirely once a .vscodeignore
+# exists — so without these two lines the dev host's sessions/, weeks/ and
+# poll.lease ship inside the vsix.
+.vscode-test-host/**
+.vscode-screenshot-host/**
+
+*.vsix

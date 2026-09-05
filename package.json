@@ -1,0 +1,141 @@
+{
+  "name": "claude-usage-graph",
+  "displayName": "Claude Usage Graph",
+  "description": "Track your Claude subscription limits over time with two cumulative stepped-line graphs.",
+  "version": "1.0.1",
+  "license": "AGPL-3.0-only",
+  "publisher": "27068",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/27068/claude-usage-graph.git"
+  },
+  "homepage": "https://github.com/27068/claude-usage-graph#readme",
+  "bugs": {
+    "url": "https://github.com/27068/claude-usage-graph/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "usage",
+    "rate limit",
+    "quota",
+    "graph"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeUsageGraph.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Claude Usage"
+      },
+      {
+        "command": "claudeUsageGraph.refreshNow",
+        "title": "Refresh Now",
+        "category": "Claude Usage"
+      },
+      {
+        "command": "claudeUsageGraph.openSettings",
+        "title": "Open Settings",
+        "category": "Claude Usage",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "claudeUsageGraph.showLogs",
+        "title": "Show Logs",
+        "category": "Claude Usage",
+        "icon": "$(output)"
+      },
+      {
+        "command": "claudeUsageGraph.loadTestScenario",
+        "title": "Load Test Scenario",
+        "category": "Claude Usage"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Usage Graph",
+      "properties": {
+        "claudeUsageGraph.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show current 5-hour and weekly usage in the status bar."
+        },
+        "claudeUsageGraph.hiddenSeries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Series to hide on the Weekly Usage graph, named by their column key (for example seven_day_opus). Empty shows everything. The graph draws whichever weekly windows your plan actually reports, so there is no fixed list to choose from — a model your plan does not meter is never drawn in the first place."
+        },
+        "claudeUsageGraph.retentionDays": {
+          "type": "number",
+          "default": 365,
+          "minimum": 1,
+          "maximum": 3650,
+          "description": "How many days of usage history to keep, measured from when each window finished. Applies when a window is reloaded, and lowering it permanently deletes the files that fall outside the new window — a little at a time in the background, so a large reduction can take a while to finish. The dashboard stays usable throughout."
+        },
+        "claudeUsageGraph.useMockData": {
+          "type": "boolean",
+          "default": false,
+          "description": "Replay bundled synthetic fixtures instead of contacting Anthropic. Intended for development."
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "claudeUsageGraph.loadTestScenario",
+          "when": "claudeUsageGraph.testMode"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "claudeUsageGraph.showLogs",
+          "when": "activeWebviewPanelId == 'claudeUsageGraph.dashboard'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeUsageGraph.openSettings",
+          "when": "activeWebviewPanelId == 'claudeUsageGraph.dashboard'",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && npm run typecheck:webview && npm run build:webview",
+    "watch": "tsc -watch -p ./",
+    "fixture:screenshot": "node scripts/make-screenshot-fixture.mjs",
+    "screenshot:prepare": "node scripts/reset-dev-ledger.mjs .vscode-screenshot-host && npm run fixture:screenshot",
+    "testhost:prepare": "node scripts/reset-dev-ledger.mjs .vscode-test-host",
+    "build:webview": "esbuild src/webview/client/main.ts --bundle --minify --format=iife --target=es2020 --outfile=media/dashboard.js",
+    "typecheck:webview": "tsc -p tsconfig.webview.json",
+    "test:unit": "tsc -p ./ && mocha",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.9.2",
+    "chart.js": "^4.5.1",
+    "esbuild": "^0.28.2",
+    "mocha": "^12.0.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "name": "Weekly cycle three cycles stale",
+  "description": "Newest weekly data closed at minute -20160; the live cycle ends at 10080. Graph 2 must frame the live one with Now in it and no placeholder. Page back three for the data.",
+  "nowMin": 2100,
+  "frames": [
+    {
+      "atMin": -21060,
+      "five": 3,
+      "fiveResetMin": -20760,
+      "seven": 40,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21054,
+      "five": 5,
+      "fiveResetMin": -20760,
+      "seven": 40,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21048,
+      "five": 6,
+      "fiveResetMin": -20760,
+      "seven": 41,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21042,
+      "five": 8,
+      "fiveResetMin": -20760,
+      "seven": 41,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21036,
+      "five": 10,
+      "fiveResetMin": -20760,
+      "seven": 41,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21030,
+      "five": 11,
+      "fiveResetMin": -20760,
+      "seven": 42,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21024,
+      "five": 13,
+      "fiveResetMin": -20760,
+      "seven": 42,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21018,
+      "five": 14,
+      "fiveResetMin": -20760,
+      "seven": 43,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21012,
+      "five": 16,
+      "fiveResetMin": -20760,
+      "seven": 43,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21006,
+      "five": 18,
+      "fiveResetMin": -20760,
+      "seven": 43,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -21000,
+      "five": 19,
+      "fiveResetMin": -20760,
+      "seven": 44,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20994,
+      "five": 21,
+      "fiveResetMin": -20760,
+      "seven": 44,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20988,
+      "five": 23,
+      "fiveResetMin": -20760,
+      "seven": 44,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20982,
+      "five": 24,
+      "fiveResetMin": -20760,
+      "seven": 45,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20976,
+      "five": 26,
+      "fiveResetMin": -20760,
+      "seven": 45,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20970,
+      "five": 27,
+      "fiveResetMin": -20760,
+      "seven": 46,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20964,
+      "five": 29,
+      "fiveResetMin": -20760,
+      "seven": 46,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20958,
+      "five": 31,
+      "fiveResetMin": -20760,
+      "seven": 46,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20952,
+      "five": 32,
+      "fiveResetMin": -20760,
+      "seven": 47,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20946,
+      "five": 34,
+      "fiveResetMin": -20760,
+      "seven": 47,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20940,
+      "five": 36,
+      "fiveResetMin": -20760,
+      "seven": 47,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20934,
+      "five": 37,
+      "fiveResetMin": -20760,
+      "seven": 48,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20928,
+      "five": 39,
+      "fiveResetMin": -20760,
+      "seven": 48,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20922,
+      "five": 41,
+      "fiveResetMin": -20760,
+      "seven": 48,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20916,
+      "five": 42,
+      "fiveResetMin": -20760,
+      "seven": 49,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20910,
+      "five": 44,
+      "fiveResetMin": -20760,
+      "seven": 49,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20904,
+      "five": 45,
+      "fiveResetMin": -20760,
+      "seven": 50,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20898,
+      "five": 47,
+      "fiveResetMin": -20760,
+      "seven": 50,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20892,
+      "five": 49,
+      "fiveResetMin": -20760,
+      "seven": 50,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20886,
+      "five": 50,
+      "fiveResetMin": -20760,
+      "seven": 51,
+      "sevenResetMin": -20160
+    },
+    {
+      "atMin": -20880,
+      "five": 52,
+      "fiveResetMin": -20760,
+      "seven": 51,
+      "sevenResetMin": -20160
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Line endings.
+#
+# The repository stores text as LF and `text=auto` converts on checkout, so a
+# Windows working tree gets CRLF (core.autocrlf=true, which Git for Windows sets
+# by default) while a Linux or macOS one gets LF. Committed content is identical
+# either way, which is the point: the normalisation happens on the way in, so a
+# diff between two machines is never a diff about carriage returns.
+#
+# Without this file the outcome depends on each clone's core.autocrlf setting,
+# and files written directly by tools — editors, formatters, generators — keep
+# whatever those tools wrote. That is how this tree came to hold 55 LF files
+# beside 17 CRLF ones, with Git GUIs reporting "no changes or it's a binary file"
+# on diffs whose only content was line endings.
+* text=auto
+
+# Binary content must never be converted: EOL translation corrupts it. The
+# README screenshots are the live case — a PNG that has had its 0x0D bytes
+# rewritten is simply a broken PNG.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.vsix binary

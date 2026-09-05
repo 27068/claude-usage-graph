@@ -1,0 +1,71 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile"
+    },
+    {
+      // Screenshot rig. Both differences from the plain launch are environment
+      // variables, and that is not a stylistic choice:
+      //
+      //   CUG_STORAGE_ROOT  puts this window's ledger — and its poll lease — in
+      //                  the repo, so it cannot read or write your real one.
+      //                  Isolation CANNOT be done with launch args here. An
+      //                  already-running VS Code opens the development window
+      //                  itself and keeps its own storage root, so both
+      //                  `--user-data-dir` and `--profile` are silently dropped;
+      //                  `--profile` registers the profile on the way past,
+      //                  which makes the failure look like success. `env`
+      //                  reaches the extension host process and works.
+      //   CUG_MOCK_FIXTURE  replays the generated screenshot script instead of
+      //                  the development one. Its preLaunchTask regenerates that
+      //                  file first, because it is anchored to the clock at
+      //                  generation time and goes stale within hours — F5 here
+      //                  always launches against data that ends at NOW.
+      //
+      // Check the "Claude Usage Graph" output channel after launching: the
+      // Ledger root line says which storage this window actually got.
+      "name": "Run Extension (screenshot data)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "env": {
+        "CUG_MOCK_FIXTURE": "screenshot-usage.json",
+        "CUG_STORAGE_ROOT": "${workspaceFolder}/.vscode-screenshot-host"
+      },
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "screenshot: fresh data"
+    },
+    {
+      // Manual-testing rig. Same isolation as the screenshot configuration, plus
+      // CUG_TEST_MODE, which is what unlocks "Claude Usage: Load Test Scenario"
+      // in the palette. That command swaps the ledger AND pins the clock, which
+      // is the only way to reach states that depend on where `now` sits relative
+      // to a reset boundary — a lapsed pool, a stale weekly cycle, an empty
+      // ledger. Scenarios live in `fixtures/scenarios/`; DEVELOPING.md section
+      // 10 lists what each one should look like on screen.
+      //
+      // Its ledger is thrown away and rewritten on every scenario switch, so do
+      // not point CUG_STORAGE_ROOT at anything you want to keep. The launch
+      // itself clears it too: before any scenario is loaded this host replays
+      // `mock-usage.json`, which is anchored to local midnight of the previous
+      // day, so launching on two different days would otherwise leave two
+      // weekly cycles a day apart in the same ledger.
+      "name": "Run Extension (test scenarios)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "env": {
+        "CUG_TEST_MODE": "1",
+        "CUG_STORAGE_ROOT": "${workspaceFolder}/.vscode-test-host"
+      },
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "test scenarios: fresh ledger"
+    }
+  ]
+}

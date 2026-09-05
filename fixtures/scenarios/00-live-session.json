@@ -1,0 +1,154 @@
+{
+  "name": "Live session",
+  "description": "Baseline. Pool open 09:00-14:00, now 11:00. Bar shows a percentage and both countdowns.",
+  "nowMin": 2100,
+  "frames": [
+    {
+      "atMin": 1980,
+      "five": 2,
+      "fiveResetMin": 2280,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1986,
+      "five": 4,
+      "fiveResetMin": 2280,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1992,
+      "five": 6,
+      "fiveResetMin": 2280,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1998,
+      "five": 8,
+      "fiveResetMin": 2280,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2004,
+      "five": 10,
+      "fiveResetMin": 2280,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2010,
+      "five": 12,
+      "fiveResetMin": 2280,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2016,
+      "five": 14,
+      "fiveResetMin": 2280,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2022,
+      "five": 16,
+      "fiveResetMin": 2280,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2028,
+      "five": 18,
+      "fiveResetMin": 2280,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2034,
+      "five": 20,
+      "fiveResetMin": 2280,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2040,
+      "five": 22,
+      "fiveResetMin": 2280,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2046,
+      "five": 23,
+      "fiveResetMin": 2280,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2052,
+      "five": 25,
+      "fiveResetMin": 2280,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2058,
+      "five": 27,
+      "fiveResetMin": 2280,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2064,
+      "five": 29,
+      "fiveResetMin": 2280,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2070,
+      "five": 31,
+      "fiveResetMin": 2280,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2076,
+      "five": 33,
+      "fiveResetMin": 2280,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2082,
+      "five": 35,
+      "fiveResetMin": 2280,
+      "seven": 18,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2088,
+      "five": 37,
+      "fiveResetMin": 2280,
+      "seven": 18,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2094,
+      "five": 39,
+      "fiveResetMin": 2280,
+      "seven": 19,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2100,
+      "five": 41,
+      "fiveResetMin": 2280,
+      "seven": 19,
+      "sevenResetMin": 9180
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "description": "Deterministic replay for development. Offsets are minutes from local midnight of the previous day, so the data lands inside the 30-day retention window and includes a session that crosses midnight. Each frame is turned into a raw API payload and passed through the real normalizer, so the whole pipeline is exercised rather than bypassed.",
+  "frames": [
+    {
+      "atMin": 480,
+      "five": 2,
+      "fiveResetMin": 780,
+      "seven": 11,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 483,
+      "five": 2,
+      "fiveResetMin": 780,
+      "seven": 11,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 486,
+      "five": 2,
+      "fiveResetMin": 780,
+      "seven": 11,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 489,
+      "five": 18,
+      "fiveResetMin": 780,
+      "seven": 12,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 492,
+      "five": 18,
+      "fiveResetMin": 780,
+      "seven": 12,
+      "sevenResetMin": 5760
+    },
+    {
+      "_case": "48 minutes away AND the value moved: this must break the line",
+      "atMin": 540,
+      "five": 41,
+      "fiveResetMin": 780,
+      "seven": 15,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 543,
+      "five": 41,
+      "fiveResetMin": 780,
+      "seven": 15,
+      "sevenResetMin": 5760
+    },
+    {
+      "_case": "77 minutes away but nothing moved: this must NOT break the line",
+      "atMin": 620,
+      "five": 41,
+      "fiveResetMin": 780,
+      "seven": 15,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 623,
+      "five": 41,
+      "fiveResetMin": 780,
+      "seven": 15,
+      "sevenResetMin": 5760
+    },
+    {
+      "_case": "new five-hour window: rolls onto a fresh session file",
+      "atMin": 840,
+      "five": 5,
+      "fiveResetMin": 1140,
+      "seven": 16,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 843,
+      "five": 26,
+      "fiveResetMin": 1140,
+      "seven": 18,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 900,
+      "five": 58,
+      "fiveResetMin": 1140,
+      "seven": 21,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 903,
+      "five": 58,
+      "fiveResetMin": 1140,
+      "seven": 21,
+      "sevenResetMin": 5760
+    },
+    {
+      "_case": "starts at 23:00 and resets at 04:00 \u2014 belongs to the day it STARTED on",
+      "atMin": 1380,
+      "five": 7,
+      "fiveResetMin": 1680,
+      "seven": 22,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 1400,
+      "five": 22,
+      "fiveResetMin": 1680,
+      "seven": 23,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 1440,
+      "five": 35,
+      "fiveResetMin": 1680,
+      "seven": 24,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 1500,
+      "five": 61,
+      "fiveResetMin": 1680,
+      "seven": 26,
+      "sevenResetMin": 5760
+    },
+    {
+      "atMin": 1560,
+      "five": 61,
+      "fiveResetMin": 1680,
+      "seven": 26,
+      "sevenResetMin": 5760
+    }
+  ]
+}

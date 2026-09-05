@@ -1,0 +1,511 @@
+{
+  "name": "Quiet day, data on record",
+  "description": "Session yesterday, nothing today. Graph 1 must draw today blank with Now, not the placeholder. Page back one day for the data.",
+  "nowMin": 2100,
+  "frames": [
+    {
+      "atMin": 540,
+      "five": 4,
+      "fiveResetMin": 840,
+      "seven": 8,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 546,
+      "five": 5,
+      "fiveResetMin": 840,
+      "seven": 8,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 552,
+      "five": 7,
+      "fiveResetMin": 840,
+      "seven": 8,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 558,
+      "five": 8,
+      "fiveResetMin": 840,
+      "seven": 9,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 564,
+      "five": 10,
+      "fiveResetMin": 840,
+      "seven": 9,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 570,
+      "five": 11,
+      "fiveResetMin": 840,
+      "seven": 9,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 576,
+      "five": 13,
+      "fiveResetMin": 840,
+      "seven": 9,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 582,
+      "five": 14,
+      "fiveResetMin": 840,
+      "seven": 10,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 588,
+      "five": 16,
+      "fiveResetMin": 840,
+      "seven": 10,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 594,
+      "five": 17,
+      "fiveResetMin": 840,
+      "seven": 10,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 600,
+      "five": 19,
+      "fiveResetMin": 840,
+      "seven": 10,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 606,
+      "five": 20,
+      "fiveResetMin": 840,
+      "seven": 10,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 612,
+      "five": 22,
+      "fiveResetMin": 840,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 618,
+      "five": 23,
+      "fiveResetMin": 840,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 624,
+      "five": 25,
+      "fiveResetMin": 840,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 630,
+      "five": 26,
+      "fiveResetMin": 840,
+      "seven": 11,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 636,
+      "five": 28,
+      "fiveResetMin": 840,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 642,
+      "five": 29,
+      "fiveResetMin": 840,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 648,
+      "five": 31,
+      "fiveResetMin": 840,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 654,
+      "five": 32,
+      "fiveResetMin": 840,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 660,
+      "five": 34,
+      "fiveResetMin": 840,
+      "seven": 12,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 666,
+      "five": 35,
+      "fiveResetMin": 840,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 672,
+      "five": 36,
+      "fiveResetMin": 840,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 678,
+      "five": 38,
+      "fiveResetMin": 840,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 684,
+      "five": 39,
+      "fiveResetMin": 840,
+      "seven": 13,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 690,
+      "five": 41,
+      "fiveResetMin": 840,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 696,
+      "five": 42,
+      "fiveResetMin": 840,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 702,
+      "five": 44,
+      "fiveResetMin": 840,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 708,
+      "five": 45,
+      "fiveResetMin": 840,
+      "seven": 14,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 714,
+      "five": 47,
+      "fiveResetMin": 840,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 720,
+      "five": 48,
+      "fiveResetMin": 840,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 726,
+      "five": 50,
+      "fiveResetMin": 840,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 732,
+      "five": 51,
+      "fiveResetMin": 840,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 738,
+      "five": 53,
+      "fiveResetMin": 840,
+      "seven": 15,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 744,
+      "five": 54,
+      "fiveResetMin": 840,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 750,
+      "five": 56,
+      "fiveResetMin": 840,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 756,
+      "five": 57,
+      "fiveResetMin": 840,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 762,
+      "five": 59,
+      "fiveResetMin": 840,
+      "seven": 16,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 768,
+      "five": 60,
+      "fiveResetMin": 840,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 774,
+      "five": 62,
+      "fiveResetMin": 840,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 780,
+      "five": 63,
+      "fiveResetMin": 840,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1920,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1926,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1932,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1938,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1944,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1950,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1956,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1962,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1968,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1974,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1980,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1986,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1992,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 1998,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2004,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2010,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2016,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2022,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2028,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2034,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2040,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2046,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2052,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2058,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2064,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2070,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2076,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2082,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2088,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2094,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    },
+    {
+      "atMin": 2100,
+      "five": null,
+      "fiveResetMin": null,
+      "seven": 17,
+      "sevenResetMin": 9180
+    }
+  ]
+}
