@@ -11,7 +11,6 @@ import { PollSchedule } from './core/pollSchedule';
 import { addLocalDays, startOfLocalDay } from './core/sessions';
 import { POLL_INTERVAL_MS, UsageEngine } from './core/usageEngine';
 import type { LedgerUpdatedEvent, Meta, StatusEvent } from './core/types';
-import { ClaudeCliRefresher } from './vscode/claudeCliRefresher';
 import { DashboardPanel, VIEW_TYPE } from './vscode/dashboardPanel';
 import { HttpUsagePoller } from './vscode/httpUsagePoller';
 import { MockUsagePoller } from './vscode/mockUsagePoller';
@@ -94,9 +93,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     : undefined;
   const credentials = new CredentialReader(clock, logger);
   const poller = mockPoller ?? new HttpUsagePoller(credentials, clock, logger);
-  // Mock mode reads no credential and so can never report one stale; giving it a
-  // refresher would only add a way to start a CLI that fixes nothing.
-  const refresher = useMock ? undefined : new ClaudeCliRefresher(credentials, logger);
+  /**
+   * No refresher is wired in, and that is not an oversight.
+   *
+   * `claude doctor` renews correctly when a person runs it in a terminal. Spawned
+   * from the extension host it redeems the refresh token and does not persist the
+   * replacement: it exits 0 after a genuine ~900ms run, leaves the credential
+   * file untouched and still stale, and the token it just spent is dead. Nothing
+   * downstream can see that — the file looks renewable — so the next process to
+   * use it is refused, and Claude Code blanks the store. The user is signed out
+   * by a dashboard.
+   *
+   * Observed twice, reproducibly, against a real credential store. Which of the
+   * ignored stdio, the absent TTY or the host's environment causes it is not
+   * known, and the difference is not worth a login to find out. Until it is, a
+   * stale token waits for Claude Code to renew it, which is what that state was
+   * designed around. `vscode/claudeCliRefresher.ts` stays in the tree, unwired.
+   */
+  const refresher = undefined;
 
   if (useMock) {
     logger.info(`Running with synthetic fixture data (development mode, ${fixtureFile})`);

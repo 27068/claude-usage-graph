@@ -2,11 +2,6 @@
 
 ## 1.1.0
 
-- **An expired access token now renews itself.** Claude Code refreshes the token
-  as part of its own startup, so the extension asks its CLI to do exactly that
-  and polls again in the same turn. It costs no token quota, and nothing here
-  mints, writes or holds a credential — the store is still read-only to this
-  extension.
 - **Three authentication situations, told apart.** A token that has gone stale
   after a few hours away is not a fault and is no longer coloured as one. A
   login that has genuinely expired says so and asks you to sign in. A credential
