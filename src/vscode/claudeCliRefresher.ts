@@ -116,10 +116,11 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
         // one more thing that could stall.
         cwd: os.homedir(),
         // stdin stays closed — the CLI must never be able to wait on input here
-        // — but its own report is captured rather than discarded. It says
-        // whether it could see the credentials at all, which is the difference
-        // between a renewal that was refused and one that was never attempted,
-        // and no amount of reading the file afterwards recovers it.
+        // — while its report is captured for a human to read rather than
+        // discarded. It is not a signal: the API-dependent checks report success
+        // on an invalid token and offline alike, so a healthy report is
+        // consistent with nothing having been reached. Only the credential on
+        // disk says what happened.
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });

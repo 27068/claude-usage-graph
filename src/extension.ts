@@ -97,16 +97,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
    * No refresher is wired in, and that is not an oversight.
    *
    * `claude doctor` renews a stale access token when a person runs it in a
-   * terminal. Spawned from the extension host it does not, and not for want of
-   * seeing the credential: it exits 0 after a genuine ~1000ms run, prints the
-   * authenticated form of every diagnostic it has, reports no installation
-   * issues — and writes nothing. Five seconds of re-reading afterwards find the
-   * credential exactly as stale as before.
+   * terminal. Spawned from the extension host it exits 0 after a genuine
+   * ~1000ms run and writes no credential — five seconds of re-reading afterwards
+   * find it exactly as stale as before. Why is unknown, and each attempt to find
+   * out costs a login.
    *
-   * The spawn shape is not the cause; the same arguments from an ordinary node
-   * process reach the credentials and report the same authenticated state. What
-   * differs between a terminal and this host is unknown, and answering it costs
-   * a login each attempt.
+   * **Its own output settles nothing.** It reports the API-dependent checks as
+   * succeeding when the token is invalid and when the machine is offline alike,
+   * so a healthy-looking report is consistent with the CLI having reached
+   * nothing at all. The captured output below is for a human to read, never a
+   * signal to branch on — the credential on disk is the only evidence here.
    *
    * So a stale token waits for Claude Code to renew it, which is what that state
    * was designed around. `vscode/claudeCliRefresher.ts` stays in the tree with
