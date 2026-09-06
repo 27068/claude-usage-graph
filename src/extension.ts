@@ -96,20 +96,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /**
    * No refresher is wired in, and that is not an oversight.
    *
-   * Nothing needs asking. While Claude Code is installed and running, a stale
-   * credential is renewed on its own within a minute or two — measured at 25s
-   * and 92s with no command invoked at all, no CLI, and no request of any kind.
-   * Something in Claude Code watches its own credential store.
+   * **Spawning the CLI against a stale credential destroys the login.** Run
+   * non-interactively — from this host, and from a shell with the staleness
+   * verified in the same breath — `claude doctor` exits 0 in under a second,
+   * writes nothing, and leaves a refresh token that no longer works. The file
+   * still looks renewable, so nothing sees it; the next process to use the token
+   * is refused and Claude Code blanks the store. Observed twice, against the
+   * control: the same credential backdated and left alone renews normally.
    *
-   * That is why `stale-token` needs no action behind it, and it is also why the
-   * CLI looked like the thing doing the renewing: run anything at all against a
-   * stale credential and the background renewal lands seconds later, on top of
-   * it. `claude doctor` in particular writes no credential — four direct runs
-   * from four different kinds of host, watching the file — and the runs that
-   * appeared to prove otherwise were that coincidence.
+   * Run by a person in a terminal it renews correctly and repeatedly, so
+   * interactivity appears to be the boundary — but that is the part not pinned
+   * down, and pinning it down costs a login each attempt.
    *
-   * So an invocation here would spend a process start to take credit for
-   * something already happening.
+   * None of which needs solving here. A running Claude Code renews its own
+   * credential without being asked, which is what `stale-token` waits for.
    *
    * **Its own output settles nothing.** It reports the API-dependent checks as
    * succeeding when the token is invalid and when the machine is offline alike,
