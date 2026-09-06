@@ -491,6 +491,36 @@ document.addEventListener('change', (event) => {
   render();
 });
 
+/** Injected by `scripts/build-webview.mjs` at bundle time. */
+declare const __BUILD_TIME__: string;
+
+/**
+ * Name the build on screen, but only for an unreleased one.
+ *
+ * A prerelease suffix is the signal: a Marketplace build is a plain `x.y.z` and
+ * shows nothing. `extensionMode` cannot serve here, since an installed `-dev`
+ * vsix runs as Production exactly like a published one.
+ *
+ * The time is when the *bundle* was built, which is what makes it worth
+ * printing: it goes stale the moment a compile is skipped, where a version
+ * number or an install date would both still look current.
+ *
+ * Showing it unconditionally would put a timestamp in front of every published
+ * reader to cover a case they do not have. A release is verified against a
+ * version freshly bumped and never installed before, so the version itself
+ * identifies that build; the stamp is only needed across a dev cycle, where the
+ * version stays put from one build to the next.
+ */
+function showBuild(version: string): void {
+  const footer = element('build');
+  const unreleased = version.includes('-');
+
+  footer.hidden = !unreleased;
+  if (unreleased) {
+    footer.textContent = `${version} · built ${new Date(__BUILD_TIME__).toLocaleString()}`;
+  }
+}
+
 function showStatus(message: HostMessage & { type: 'status' }): void {
   const banner = element('status');
   const friendly: Record<string, string> = {
@@ -541,6 +571,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
         // Authoritative, empty included — and empty is now the ordinary case,
         // meaning "nothing switched off" rather than "nothing to draw".
         state.hiddenSeries = message.config.hiddenSeries;
+        showBuild(message.config.version);
       } else {
         applyPatch(message.patch);
       }

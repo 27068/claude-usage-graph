@@ -188,6 +188,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const panelDependencies = () => ({
     extensionUri: context.extensionUri,
+    version: String(context.extension.packageJSON.version),
     updates,
     statuses,
     cache,

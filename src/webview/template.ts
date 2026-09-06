@@ -95,6 +95,8 @@ export function renderDashboardHtml(
   </div>
 </section>
 
+<footer id="build" class="build" hidden></footer>
+
 <script nonce="${nonce}" src="${asset('dashboard.js')}"></script>
 </body>
 </html>`;

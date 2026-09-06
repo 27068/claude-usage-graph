@@ -122,7 +122,7 @@
     "fixture:screenshot": "node scripts/make-screenshot-fixture.mjs",
     "screenshot:prepare": "node scripts/reset-dev-ledger.mjs .vscode-screenshot-host && npm run fixture:screenshot",
     "testhost:prepare": "node scripts/reset-dev-ledger.mjs .vscode-test-host",
-    "build:webview": "esbuild src/webview/client/main.ts --bundle --minify --format=iife --target=es2020 --outfile=media/dashboard.js",
+    "build:webview": "node scripts/build-webview.mjs",
     "typecheck:webview": "tsc -p tsconfig.webview.json",
     "test:unit": "tsc -p ./ && mocha",
     "package": "vsce package",

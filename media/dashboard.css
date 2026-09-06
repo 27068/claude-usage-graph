@@ -24,6 +24,13 @@ body {
   background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12));
 }
 
+/* Renewal is routine, so it drops out of the warning default above rather than
+   sharing it. The banner still says what is happening; it just does not shout. */
+.status-stale-token {
+  border-left-color: var(--vscode-panel-border);
+  background: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.1));
+}
+
 .status-auth-error,
 .status-no-credentials,
 .status-network-error {
@@ -169,4 +176,14 @@ button:disabled {
 
 [hidden] {
   display: none !important;
+}
+
+/* Only ever rendered for an unreleased build — see `showBuild` in main.ts. */
+.build {
+  display: block;
+  padding: 0.4rem 0.8rem 0.8rem;
+  text-align: right;
+  font-size: 0.75rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
 }

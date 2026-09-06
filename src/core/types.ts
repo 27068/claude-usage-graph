@@ -283,6 +283,14 @@ export type ClientMessage =
 
 export interface WebviewConfig {
   /**
+   * The extension's own version, so the panel can say which build is on screen.
+   *
+   * A prerelease suffix is what marks a build as unreleased, and the panel keys
+   * its build stamp off that — `context.extensionMode` cannot, since an
+   * installed `-dev` vsix runs as Production like any other.
+   */
+  version: string;
+  /**
    * Series the reader has switched **off**, rather than the ones left on.
    *
    * Storing the complement is what lets the series set be discovered. An
