@@ -63,15 +63,26 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
       return false;
     }
 
-    // The exit code is not the answer. What matters is whether the credential on
-    // disk came back usable, and only re-reading it says so.
-    const renewed = (await this.credentials.read()).state === 'ok';
-    this.logger.info(renewed ? 'Claude Code renewed its access token.' : 'Renewal changed nothing.');
-    return renewed;
+    // Neither the exit code nor the CLI's own report answers this — it exits
+    // zero having done nothing. Only the credential on disk says, and the state
+    // it lands in is logged rather than reduced to a boolean: "still stale"
+    // and "now unreadable" are different failures with different causes, and a
+    // log that flattens them leaves the next person guessing from timestamps.
+    const after = (await this.credentials.read()).state;
+    this.logger.info(
+      after === 'ok'
+        ? 'Claude Code renewed its access token.'
+        : `Renewal changed nothing; the credential is still '${after}'.`,
+    );
+    return after === 'ok';
   }
 
   private run(executable: string): Promise<boolean> {
     return new Promise((resolve) => {
+      // Which binary, how it ended, and how long it took. All three are needed
+      // to tell a CLI that never really ran from one that ran and declined to
+      // renew, and none of them can be recovered from the outcome afterwards.
+      const startedAt = Date.now();
       const child = spawn(executable, ['doctor'], {
         // Home rather than the workspace: nothing about this depends on the
         // project, and a directory the user has never opened in Claude Code is
@@ -93,8 +104,9 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
         resolve(false);
       });
 
-      child.once('close', () => {
+      child.once('close', (code) => {
         clearTimeout(timer);
+        this.logger.info(`${executable} doctor exited ${code} after ${Date.now() - startedAt}ms`);
         resolve(true);
       });
     });
