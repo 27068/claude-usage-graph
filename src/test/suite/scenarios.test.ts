@@ -201,7 +201,7 @@ describe('test scenarios', () => {
     });
 
     it('keeps Now on graph 1 even though the line stopped hours ago', () => {
-      const view = selectPoolDay(result.ledger.sessions, result.now, 0);
+      const view = selectPoolDay(result.ledger.sessions, result.now, result.now, 0);
 
       assert.strictEqual(view.empty, false);
       assert.ok(view.domain[0] <= result.now && result.now <= view.domain[1]);
@@ -212,13 +212,13 @@ describe('test scenarios', () => {
   describe('02-quiet-day', () => {
     it('draws today blank and framed rather than showing the placeholder', async () => {
       const result = await replay('02-quiet-day.json');
-      const view = selectPoolDay(result.ledger.sessions, result.now, 0);
+      const view = selectPoolDay(result.ledger.sessions, result.now, result.now, 0);
 
       assert.strictEqual(view.sessionCount, 0, 'nothing ran today');
       assert.strictEqual(view.empty, false, 'but the ledger is not empty, so no placeholder');
       assert.ok(view.domain[0] <= result.now && result.now <= view.domain[1]);
 
-      const yesterday = selectPoolDay(result.ledger.sessions, result.now, 1);
+      const yesterday = selectPoolDay(result.ledger.sessions, result.now, result.now, 1);
       assert.ok(yesterday.sessionCount > 0, 'paging back one day must reach the data');
     });
   });
@@ -278,7 +278,7 @@ describe('test scenarios', () => {
 
       assert.strictEqual(result.ledger.sessions.length, 0);
       assert.strictEqual(result.ledger.weeks.length, 0);
-      assert.strictEqual(selectPoolDay(result.ledger.sessions, result.now, 0).empty, true);
+      assert.strictEqual(selectPoolDay(result.ledger.sessions, result.now, result.now, 0).empty, true);
       assert.strictEqual(selectCalendarWeek(result.ledger.weeks, result.now, 0).empty, true);
     });
   });

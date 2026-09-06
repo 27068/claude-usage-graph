@@ -155,9 +155,28 @@ function chartedCols(files: readonly LedgerFile[]): string[] {
  * looks.
  */
 
+/**
+ * Which instant Graph 1 pages from, which is not always `now`.
+ *
+ * A session belongs to the day it started on — that is what the 29-hour overhang
+ * exists to draw. So anchoring the live page to `now` moves it at midnight onto
+ * a day nobody has worked yet, while the pool being spent at that moment sits on
+ * the page behind it, for as long as five hours. Midnight to 05:00 is not an
+ * hour nobody looks: it is precisely when a session opened late last night is
+ * the only thing worth seeing.
+ *
+ * So while a window is open the live page follows it, and moves on by itself
+ * once it resets. Every caller has to use this — the day the clamp permits, the
+ * day the page is fetched for and the day drawn are the same day or the chart is
+ * built from the wrong page.
+ */
+export function poolAnchor(live: LedgerFile | undefined, now: Millis): Millis {
+  return live !== undefined && live.resetAt > now ? live.startAt : now;
+}
+
 /** Graph 1: the local day at `dayOffset` pages back, `[start, end)`. */
-export function poolDayRange(now: Millis, dayOffset: number): [Millis, Millis] {
-  const dayStart = startOfLocalDay(addLocalDays(startOfLocalDay(now), -dayOffset));
+export function poolDayRange(anchor: Millis, dayOffset: number): [Millis, Millis] {
+  const dayStart = startOfLocalDay(addLocalDays(startOfLocalDay(anchor), -dayOffset));
   return [dayStart, startOfLocalDay(addLocalDays(dayStart, 1))];
 }
 
@@ -201,8 +220,8 @@ export function calendarFrameRange(
  * by an hour, which floors to one day short. Rounding is exact for any span
  * where the error stays under half a day, which is every span there can be.
  */
-export function maxDayOffset(now: Millis, oldestStartAt: Millis): number {
-  const days = (startOfLocalDay(now) - startOfLocalDay(oldestStartAt)) / DAY_MS;
+export function maxDayOffset(anchor: Millis, oldestStartAt: Millis): number {
+  const days = (startOfLocalDay(anchor) - startOfLocalDay(oldestStartAt)) / DAY_MS;
   return Math.max(0, Math.round(days));
 }
 
@@ -233,10 +252,11 @@ export function maxWeekOffset(
  */
 export function selectPoolDay(
   sessions: readonly LedgerFile[],
+  anchor: Millis,
   now: Millis,
   dayOffset: number,
 ): PoolDayView {
-  const [dayStart] = poolDayRange(now, dayOffset);
+  const [dayStart] = poolDayRange(anchor, dayOffset);
   const dayKey = localDayKey(dayStart);
   const label = formatDayLabel(dayStart);
   const todays = sessionsForDay(sessions, dayStart);

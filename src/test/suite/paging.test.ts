@@ -101,8 +101,8 @@ describe('paging', () => {
       const page = await storage.readRange('five_hour', from, to);
 
       assert.deepStrictEqual(
-        selectPoolDay(held(page, live), NOW, offset),
-        selectPoolDay(sessions, NOW, offset),
+        selectPoolDay(held(page, live), NOW, NOW, offset),
+        selectPoolDay(sessions, NOW, NOW, offset),
         `pool page ${offset}`,
       );
     }

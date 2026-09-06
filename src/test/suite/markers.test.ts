@@ -88,7 +88,7 @@ describe('Now survives the frame the selectors build', () => {
       // 07:00 session, reset 12:00, asked at 17:00. A frame ending at 13:00 would
       // put Now five hours off the right edge and the marker would be dropped.
       const now = at(20, 17);
-      const view = selectPoolDay([session(at(20, 7))], now, 0);
+      const view = selectPoolDay([session(at(20, 7))], now, now, 0);
 
       assert.ok(frameContains(view.domain, now));
       assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
@@ -96,14 +96,14 @@ describe('Now survives the frame the selectors build', () => {
 
     it('while a session is open', () => {
       const now = at(20, 14);
-      const view = selectPoolDay([session(at(20, 12))], now, 0);
+      const view = selectPoolDay([session(at(20, 12))], now, now, 0);
 
       assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
     });
 
     it('on a quiet day with other days on record', () => {
       const now = at(20, 11);
-      const view = selectPoolDay([session(at(19, 9))], now, 0);
+      const view = selectPoolDay([session(at(19, 9))], now, now, 0);
 
       assert.strictEqual(view.sessionCount, 0, 'nothing ran today');
       assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
@@ -113,7 +113,7 @@ describe('Now survives the frame the selectors build', () => {
     // it before the frame is widened.
     it('on an empty ledger, early morning and late evening alike', () => {
       for (const now of [at(20, 6), at(20, 22)]) {
-        const view = selectPoolDay([], now, 0);
+        const view = selectPoolDay([], now, now, 0);
         assert.strictEqual(
           markersInFrame([marker(now)], view.domain).length,
           1,
@@ -124,13 +124,13 @@ describe('Now survives the frame the selectors build', () => {
 
     it('when the day\'s only session has not started yet', () => {
       const now = at(20, 2);
-      const view = selectPoolDay([session(at(20, 23))], now, 0);
+      const view = selectPoolDay([session(at(20, 23))], now, now, 0);
 
       assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
     });
 
     it('still draws every reset wall the view reports', () => {
-      const view = selectPoolDay([session(at(20, 7)), session(at(20, 13))], at(20, 17), 0);
+      const view = selectPoolDay([session(at(20, 7)), session(at(20, 13))], at(20, 17), at(20, 17), 0);
       const walls = view.resets.map((reset) => marker(reset.at));
 
       assert.ok(walls.length > 0);

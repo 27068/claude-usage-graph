@@ -88,7 +88,7 @@ describe('mock harness (end to end)', () => {
 
   it('buckets every session under the day it started, including the late one', () => {
     const yesterday = addLocalDays(startOfLocalDay(NOW), -1);
-    const view = selectPoolDay(sessions, NOW, 1);
+    const view = selectPoolDay(sessions, NOW, NOW, 1);
 
     assert.strictEqual(view.sessionCount, 3, 'all three started yesterday');
     assert.strictEqual(view.domain[0], yesterday + 7 * 3_600_000, '08:00 start, framed from 07:00');

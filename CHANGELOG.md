@@ -14,6 +14,11 @@
 - Being offline no longer asks you to sign in. A renewal that could not run
   leaves the credential untouched, which is what separates it from one that was
   refused.
+- **Session Usage no longer goes blank at midnight.** A session belongs to the
+  day it started, so a window opened late last night stays on last night's page
+  — and the live view now follows it there until it resets, instead of jumping
+  to a day nobody has worked yet while the pool you are spending sits on the
+  page behind.
 
 ## 1.0.1
 
