@@ -476,6 +476,12 @@ not appearing and the bundle checks out, this is why.
 not change between local builds, so without it VS Code sees a version it already
 has and the install is a silent no-op.
 
+Between releases the version carries a `-dev` suffix — see section 11 — and that
+is what tells the two builds apart at a glance: a plain `1.1.0` in the Extensions
+list came from the Marketplace, `1.1.1-dev` is one of yours. It does not remove
+the need for `--force`, since the dev version is just as constant across local
+builds as a release version is.
+
 To settle it in one command, compare what is installed against what you built.
 VS Code keeps extensions in `~/.vscode/extensions/` on every platform, so only
 the shell differs:
@@ -725,6 +731,12 @@ The order, once; the reasoning for each part is below.
 
 1. `npm version <x.y.z> --no-git-tag-version` — bump before packaging, since the
    version is baked into the vsix filename and into what the Marketplace accepts.
+   The flag suppresses npm's *commit as well as* its tag, despite the name: left
+   to itself npm commits the two version files alone and tags that commit, which
+   would put `v<x.y.z>` on a tree containing neither the changelog nor the code.
+   The tag is made by hand at step 5 instead. Editing the version by hand is not
+   the same thing — it leaves `package-lock.json` behind, and `npm install
+   --package-lock-only` is the repair.
 2. Add that version's entry to `CHANGELOG.md`. It is the listing's Changelog tab,
    so it is release notes for strangers rather than a commit summary.
 3. `npm run test:unit`, then `npm run package`.
@@ -734,6 +746,24 @@ The order, once; the reasoning for each part is below.
 5. Commit the bump and the changelog together, and tag that commit.
 6. Push, tag included.
 7. Upload, by one of the two routes below.
+8. Bump straight away to the *next* version with a `-dev` suffix, so that no
+   local build can be mistaken for the published one — section 5.
+
+Step 8 starts at the next **patch** — `1.1.1-dev` once `1.1.0` is out — because a
+patch predicts nothing, and raise it as the work settles: `1.2.0-dev` once a
+feature has landed rather than a fix. Every real release outranks it whichever
+you end up shipping, since a version beats the same version carrying a prerelease
+tag:
+
+```
+1.1.0  <  1.1.1-dev  <  1.1.1  <  1.2.0  <  2.0.0
+```
+
+So step 1 of the next release is dropping the suffix rather than incrementing,
+and an installed dev build is superseded by whatever supersedes it in fact.
+`vsce` validates the version with plain `semver.valid`, so a suffix packages
+without complaint — a `-dev` version is never the one uploaded, so whether the
+Marketplace would accept one has never had to be answered.
 
 `npm run package` writes `claude-usage-graph-<version>.vsix`, and
 `vscode:prepublish` runs the full compile first, so the vsix cannot carry a stale
