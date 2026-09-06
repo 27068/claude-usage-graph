@@ -97,16 +97,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
    * No refresher is wired in, and that is not an oversight.
    *
    * `claude doctor` renews a stale access token reliably when a person runs it
-   * in a terminal. Spawned from the extension host it did not: it exited 0 after
-   * a genuine ~1000ms run and wrote no credential, five seconds of re-reading
-   * finding the file exactly as stale as before. The login was dead by the next
-   * use, while the same credential backdated and left alone renews normally —
-   * so the call is implicated in the loss, on one observation each way.
+   * in a terminal, and does not renew at all when a process spawns it — observed
+   * from this host and from a plain node process alike. It exits 0 after a real
+   * run of one to three seconds and writes nothing; five seconds of re-reading
+   * afterwards find the credential exactly as stale as before. Being spawned is
+   * the boundary, not this host in particular, so there is no arrangement of
+   * arguments here that would make it work.
    *
-   * That is thin evidence for a claim about cause, and deliberately not the
-   * reason this is unwired. The reason is that it demonstrably does not renew
-   * from here, so there is nothing to weigh against even a suspected cost, and
-   * each further attempt to pin it down spends a login.
+   * A stale token therefore waits for Claude Code, which renews it on its next
+   * request without being asked — that is the behaviour the `stale-token` state
+   * was built around, and it is enough.
    *
    * **Its own output settles nothing.** It reports the API-dependent checks as
    * succeeding when the token is invalid and when the machine is offline alike,
