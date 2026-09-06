@@ -7,6 +7,7 @@ import {
   calendarFrameRange,
   maxDayOffset,
   maxWeekOffset,
+  poolAnchor,
   poolDayRange,
   selectCalendarWeek,
   selectPoolDay,
@@ -51,7 +52,7 @@ describe('selectPoolDay', () => {
   it('clips the axis to the sessions that exist, not to midnight', () => {
     // Asked at 11:00, inside the session — so the frame is decided by the data
     // alone and the Now rule below has nothing to add.
-    const view = selectPoolDay([session(at(20, 7))], at(20, 11), 0);
+    const view = selectPoolDay([session(at(20, 7))], at(20, 11), at(20, 11), 0);
 
     assert.strictEqual(view.empty, false);
     assert.strictEqual(view.domain[0], at(20, 7) - POOL_BUFFER_MS, 'a 07:00 start should frame from 06:00');
@@ -63,7 +64,7 @@ describe('selectPoolDay', () => {
   // without saying so.
   it('stretches the live frame to reach Now after the last session has reset', () => {
     // 07:00 session, reset 12:00, asked at 17:00.
-    const view = selectPoolDay([session(at(20, 7))], at(20, 17), 0);
+    const view = selectPoolDay([session(at(20, 7))], at(20, 17), at(20, 17), 0);
 
     assert.strictEqual(view.domain[0], at(20, 7) - POOL_BUFFER_MS, 'the left edge still follows the data');
     assert.strictEqual(view.domain[1], at(20, 17) + POOL_BUFFER_MS, 'the right edge must clear Now');
@@ -71,14 +72,14 @@ describe('selectPoolDay', () => {
 
   it('leaves the frame alone while a window is still open', () => {
     // 12:00 session resets at 17:00, which is already past Now at 14:00.
-    const view = selectPoolDay([session(at(20, 12))], at(20, 14), 0);
+    const view = selectPoolDay([session(at(20, 12))], at(20, 14), at(20, 14), 0);
 
     assert.strictEqual(view.domain[1], at(20, 17) + POOL_BUFFER_MS, 'the reset frames it, not Now');
   });
 
   it('reaches back to Now on a day whose only session starts later', () => {
     // Asked at 02:00; the day's session does not begin until 23:00.
-    const view = selectPoolDay([session(at(20, 23))], at(20, 2), 0);
+    const view = selectPoolDay([session(at(20, 23))], at(20, 2), at(20, 2), 0);
 
     assert.ok(view.domain[0] <= at(20, 2), 'Now must be inside the frame, not off the left edge');
   });
@@ -86,31 +87,68 @@ describe('selectPoolDay', () => {
   it('puts Now inside the placeholder frame for an empty today', () => {
     // The placeholder is 09:00-18:00, so an early morning or late evening Now
     // falls outside it.
-    const early = selectPoolDay([], at(20, 6), 0);
+    const early = selectPoolDay([], at(20, 6), at(20, 6), 0);
     assert.strictEqual(early.empty, true);
     assert.ok(early.domain[0] <= at(20, 6), 'a 06:00 Now must be on the axis');
 
-    const late = selectPoolDay([], at(20, 22), 0);
+    const late = selectPoolDay([], at(20, 22), at(20, 22), 0);
     assert.ok(late.domain[1] >= at(20, 22), 'a 22:00 Now must be on the axis');
   });
 
   // Historical pages must stay perfectly still; only the live page tracks Now.
   it('never moves a historical frame to chase Now', () => {
-    const view = selectPoolDay([session(at(19, 7))], at(20, 17), 1);
+    const view = selectPoolDay([session(at(19, 7))], at(20, 17), at(20, 17), 1);
 
     assert.strictEqual(view.domain[0], at(19, 7) - POOL_BUFFER_MS);
     assert.strictEqual(view.domain[1], at(19, 12) + POOL_BUFFER_MS);
   });
 
   it('pads exactly one hour on each side', () => {
-    const view = selectPoolDay([session(at(20, 9))], NOW, 0);
+    const view = selectPoolDay([session(at(20, 9))], NOW, NOW, 0);
     const span = view.domain[1] - view.domain[0];
     assert.strictEqual(span, 5 * HOUR + 2 * POOL_BUFFER_MS);
+  });
+
+  it('keeps an open session on the live page after midnight', () => {
+    // The session opened at 23:30 belongs to the 20th, so at 00:05 the page for
+    // `now` is a day nobody has worked yet — and the pool being spent right then
+    // is on the page behind it, for the five hours somebody is most likely to be
+    // looking at this.
+    const started = at(20, 23, 30);
+    const open = session(started, [
+      [started, 12],
+      [at(21, 0, 4), 18],
+    ]);
+    const now = at(21, 0, 5);
+
+    const view = selectPoolDay([open], poolAnchor(open, now), now, 0);
+
+    assert.strictEqual(view.sessionCount, 1, 'the running session must stay on screen');
+    assert.strictEqual(view.dayKey, localDayKey(at(20, 12)), 'still the day it started');
+    assert.ok(view.domain[0] <= started && view.domain[1] >= now, 'frame holds session and now');
+  });
+
+  it('moves the live page on once the window has closed', () => {
+    // The anchor follows an *open* window only. Once it resets, offset 0 is the
+    // ordinary day again and a quiet morning correctly draws blank.
+    const closed = session(at(20, 10));
+    const now = at(21, 0, 5);
+
+    const view = selectPoolDay([closed], poolAnchor(closed, now), now, 0);
+
+    assert.strictEqual(view.sessionCount, 0);
+    assert.strictEqual(view.dayKey, localDayKey(now));
+  });
+
+  it('anchors to now when nothing is recorded at all', () => {
+    const now = at(21, 0, 5);
+    assert.strictEqual(poolAnchor(undefined, now), now);
   });
 
   it('spans from the earliest start to the latest reset across several sessions', () => {
     const view = selectPoolDay(
       [session(at(20, 8)), session(at(20, 13)), session(at(20, 18))],
+      NOW,
       NOW,
       0,
     );
@@ -123,7 +161,7 @@ describe('selectPoolDay', () => {
   // A session belongs to the day it STARTED on, even when it runs past midnight.
   it('files a 23:00 session under the day it started, not the day it ends', () => {
     const late = session(at(20, 23)); // resets 04:00 on the 21st
-    const view = selectPoolDay([late], NOW, 0);
+    const view = selectPoolDay([late], NOW, NOW, 0);
 
     assert.strictEqual(view.sessionCount, 1, 'the late session belongs to the 20th');
     assert.strictEqual(view.domain[1], at(21, 4) + POOL_BUFFER_MS, 'the axis must follow it past midnight');
@@ -132,12 +170,12 @@ describe('selectPoolDay', () => {
   it('files a 01:00 session under the new day', () => {
     const early = session(at(21, 1));
 
-    assert.strictEqual(selectPoolDay([early], NOW, 0).sessionCount, 0, 'not the 20th');
-    assert.strictEqual(selectPoolDay([early], at(21, 12), 0).sessionCount, 1, 'the 21st');
+    assert.strictEqual(selectPoolDay([early], NOW, NOW, 0).sessionCount, 0, 'not the 20th');
+    assert.strictEqual(selectPoolDay([early], at(21, 12), at(21, 12), 0).sessionCount, 1, 'the 21st');
   });
 
   it('reaches ~31 hours when a day runs from midnight through the overhang', () => {
-    const view = selectPoolDay([session(at(20, 0)), session(at(20, 23, 59))], NOW, 0);
+    const view = selectPoolDay([session(at(20, 0)), session(at(20, 23, 59))], NOW, NOW, 0);
     const span = view.domain[1] - view.domain[0];
 
     assert.ok(span > 30 * HOUR, `expected a ~31h span, got ${span / HOUR}h`);
@@ -146,7 +184,7 @@ describe('selectPoolDay', () => {
 
   it('clamps the right edge to 05:00 the following morning', () => {
     const overrunning: LedgerFile = { ...session(at(20, 23)), resetAt: at(21, 9) };
-    const view = selectPoolDay([overrunning], NOW, 0);
+    const view = selectPoolDay([overrunning], NOW, NOW, 0);
 
     assert.strictEqual(view.domain[1], at(21, 5) + POOL_BUFFER_MS, 'the overhang ceiling is 05:00');
   });
@@ -154,19 +192,19 @@ describe('selectPoolDay', () => {
   // Symmetrical with Graph 2: a quiet day still has a frame, a label and Now, so
   // it draws blank rather than hiding behind a placeholder.
   it('does not call a quiet day empty when other days are on record', () => {
-    const view = selectPoolDay([session(at(19, 9))], NOW, 0);
+    const view = selectPoolDay([session(at(19, 9))], NOW, NOW, 0);
 
     assert.strictEqual(view.sessionCount, 0, 'nothing today');
     assert.strictEqual(view.empty, false, 'but the ledger is not empty');
   });
 
   it('reports empty only when no session has ever been recorded', () => {
-    assert.strictEqual(selectPoolDay([], NOW, 0).empty, true);
-    assert.strictEqual(selectPoolDay([session(at(1, 9))], NOW, 0).empty, false);
+    assert.strictEqual(selectPoolDay([], NOW, NOW, 0).empty, true);
+    assert.strictEqual(selectPoolDay([session(at(1, 9))], NOW, NOW, 0).empty, false);
   });
 
   it('gives an empty day a usable frame rather than a degenerate axis', () => {
-    const view = selectPoolDay([], NOW, 0);
+    const view = selectPoolDay([], NOW, NOW, 0);
 
     assert.strictEqual(view.empty, true);
     assert.strictEqual(view.sessionCount, 0);
@@ -175,13 +213,13 @@ describe('selectPoolDay', () => {
   });
 
   it('walks back one day per offset', () => {
-    assert.strictEqual(selectPoolDay([], NOW, 0).dayKey, localDayKey(at(20, 0)));
-    assert.strictEqual(selectPoolDay([], NOW, 1).dayKey, localDayKey(at(19, 0)));
-    assert.strictEqual(selectPoolDay([], NOW, 7).dayKey, localDayKey(at(13, 0)));
+    assert.strictEqual(selectPoolDay([], NOW, NOW, 0).dayKey, localDayKey(at(20, 0)));
+    assert.strictEqual(selectPoolDay([], NOW, NOW, 1).dayKey, localDayKey(at(19, 0)));
+    assert.strictEqual(selectPoolDay([], NOW, NOW, 7).dayKey, localDayKey(at(13, 0)));
   });
 
   it('uses the same Reset wording on both graphs', () => {
-    const pool = selectPoolDay([session(at(20, 8))], NOW, 0);
+    const pool = selectPoolDay([session(at(20, 8))], NOW, NOW, 0);
     const calendar = selectCalendarWeek(
       [week(at(14, 9), at(21, 9), [[at(15, 10), 14, 39, null, null]])],
       NOW,
@@ -193,7 +231,7 @@ describe('selectPoolDay', () => {
   });
 
   it('exposes each session reset so Graph 1 can draw its walls', () => {
-    const view = selectPoolDay([session(at(20, 8)), session(at(20, 14))], NOW, 0);
+    const view = selectPoolDay([session(at(20, 8)), session(at(20, 14))], NOW, NOW, 0);
 
     assert.deepStrictEqual(view.resets, [
       { at: at(20, 13), label: 'Reset 13:00' },
@@ -203,21 +241,21 @@ describe('selectPoolDay', () => {
 
   it('omits a reset that the overhang ceiling clipped off the frame', () => {
     const overrunning: LedgerFile = { ...session(at(20, 23)), resetAt: at(21, 9) };
-    const view = selectPoolDay([overrunning], NOW, 0);
+    const view = selectPoolDay([overrunning], NOW, NOW, 0);
 
     assert.deepStrictEqual(view.resets, [], 'a wall beyond 05:00 would sit off the edge');
   });
 
   it('renders a single sample as a plottable point', () => {
     // A brand-new ledger has exactly one row; the view must still be non-empty.
-    const view = selectPoolDay([session(at(20, 9), [[at(20, 9), 53]])], NOW, 0);
+    const view = selectPoolDay([session(at(20, 9), [[at(20, 9), 53]])], NOW, NOW, 0);
 
     assert.strictEqual(view.empty, false);
     assert.deepStrictEqual(view.series[0].points, [{ x: at(20, 9), y: 53 }]);
   });
 
   it('breaks the line between sessions instead of connecting them', () => {
-    const view = selectPoolDay([session(at(20, 8)), session(at(20, 14))], NOW, 0);
+    const view = selectPoolDay([session(at(20, 8)), session(at(20, 14))], NOW, NOW, 0);
     const points = view.series[0].points;
 
     const nulls = points.filter((point) => point.y === null);
@@ -234,7 +272,7 @@ describe('selectPoolDay', () => {
       [at(20, 8, 30) + 1, null],
       [at(20, 9), 40],
     ]);
-    const view = selectPoolDay([withGap], NOW, 0);
+    const view = selectPoolDay([withGap], NOW, NOW, 0);
 
     assert.deepStrictEqual(
       view.series[0].points.map((point) => point.y),
@@ -246,10 +284,10 @@ describe('selectPoolDay', () => {
   // refreshes, so assigning the domain on an update is a no-op.
   it('returns an identical domain for a historical page as new data arrives', () => {
     const history = [session(at(18, 9))];
-    const before = selectPoolDay(history, NOW, 2);
+    const before = selectPoolDay(history, NOW, NOW, 2);
 
     // A background tick adds today's session and extends an existing one.
-    const after = selectPoolDay([...history, session(at(20, 15))], at(20, 16), 2);
+    const after = selectPoolDay([...history, session(at(20, 15))], at(20, 16), at(20, 16), 2);
 
     assert.deepStrictEqual(after.domain, before.domain);
     assert.deepStrictEqual(after.dayKey, before.dayKey);

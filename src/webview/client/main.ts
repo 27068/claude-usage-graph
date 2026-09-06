@@ -5,6 +5,7 @@ import {
   calendarFrameRange,
   maxDayOffset,
   maxWeekOffset,
+  poolAnchor,
   poolDayRange,
   selectCalendarWeek,
   selectPoolDay,
@@ -105,7 +106,10 @@ function backLimit(): { day: number; week: number } {
   const now = state.meta?.now ?? Date.now();
   const phase = live.seven_day?.resetAt;
   return {
-    day: oldest.five_hour === undefined ? 0 : maxDayOffset(now, oldest.five_hour),
+    day:
+      oldest.five_hour === undefined
+        ? 0
+        : maxDayOffset(poolAnchor(live.five_hour, now), oldest.five_hour),
     week:
       oldest.seven_day === undefined || phase === undefined
         ? 0
@@ -222,7 +226,7 @@ function requestPage(kind: LedgerKind, mode: PageMode, from: Millis, to: Millis)
  * chart first would be the only visible event in the whole exchange.
  */
 function ensurePages(now: Millis): void {
-  const [from, to] = poolDayRange(now, state.dayOffset);
+  const [from, to] = poolDayRange(poolAnchor(live.five_hour, now), state.dayOffset);
   requestPage('five_hour', 'starts-in', from, to);
 
   // The phase comes from the newest boundary on record, which is the live file —
@@ -294,7 +298,12 @@ function render(): void {
   state.weekOffset = clamp(state.weekOffset, limit.week);
   ensurePages(now);
 
-  const pool = selectPoolDay(state.ledger.sessions, now, state.dayOffset);
+  const pool = selectPoolDay(
+    state.ledger.sessions,
+    poolAnchor(live.five_hour, now),
+    now,
+    state.dayOffset,
+  );
   element('pool-label').textContent = pool.label;
   element('pool-empty').hidden = !(state.hydrated && pool.empty);
   setMarkers(poolChart, [

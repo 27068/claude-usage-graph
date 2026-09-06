@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0
+
+- **Session Usage no longer goes blank at midnight.** A session belongs to the
+  day it started, so a session opened late last night stays on last night's
+  page. The view now follows it there until it resets, rather than moving to
+  the new day and leaving the open session on the page behind.
+- **Neither meter reports a window it can no longer see.** A weekly allowance
+  that has reset, and a session pool that has closed since the last poll, now
+  read as a dash instead of holding up the last percentage they happened to
+  show — which looked live and was not. Session Usage says `idle` only where a
+  poll has actually found no session open, rather than wherever the extension
+  has not looked yet.
+
 ## 1.0.1
 
 - An extension icon, so the Marketplace listing and the Extensions list no
