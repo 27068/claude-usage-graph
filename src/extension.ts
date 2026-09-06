@@ -96,17 +96,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /**
    * No refresher is wired in, and that is not an oversight.
    *
-   * `claude doctor` renews a stale access token reliably when a person runs it
-   * in a terminal, and does not renew at all when a process spawns it — observed
-   * from this host and from a plain node process alike. It exits 0 after a real
-   * run of one to three seconds and writes nothing; five seconds of re-reading
-   * afterwards find the credential exactly as stale as before. Being spawned is
-   * the boundary, not this host in particular, so there is no arrangement of
-   * arguments here that would make it work.
+   * Nothing needs asking. While Claude Code is installed and running, a stale
+   * credential is renewed on its own within a minute or two — measured at 25s
+   * and 92s with no command invoked at all, no CLI, and no request of any kind.
+   * Something in Claude Code watches its own credential store.
    *
-   * A stale token therefore waits for Claude Code, which renews it on its next
-   * request without being asked — that is the behaviour the `stale-token` state
-   * was built around, and it is enough.
+   * That is why `stale-token` needs no action behind it, and it is also why the
+   * CLI looked like the thing doing the renewing: run anything at all against a
+   * stale credential and the background renewal lands seconds later, on top of
+   * it. `claude doctor` in particular writes no credential — four direct runs
+   * from four different kinds of host, watching the file — and the runs that
+   * appeared to prove otherwise were that coincidence.
+   *
+   * So an invocation here would spend a process start to take credit for
+   * something already happening.
    *
    * **Its own output settles nothing.** It reports the API-dependent checks as
    * succeeding when the token is invalid and when the machine is offline alike,
