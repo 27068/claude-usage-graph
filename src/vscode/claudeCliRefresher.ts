@@ -19,6 +19,10 @@ import type { ICredentialRefresher, ICredentialStore, ILogger } from '../core/in
  */
 const TIMEOUT_MS = 30_000;
 
+/** How long a credential write may arrive after the process that made it exits. */
+const SETTLE_MS = 5_000;
+const SETTLE_POLL_MS = 200;
+
 /**
  * Renews the access token by starting Claude Code and letting it renew its own.
  *
@@ -68,13 +72,36 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
     // it lands in is logged rather than reduced to a boolean: "still stale"
     // and "now unreadable" are different failures with different causes, and a
     // log that flattens them leaves the next person guessing from timestamps.
-    const after = (await this.credentials.read()).state;
+    const after = await this.settled();
     this.logger.info(
-      after === 'ok'
-        ? 'Claude Code renewed its access token.'
-        : `Renewal changed nothing; the credential is still '${after}'.`,
+      after.state === 'ok'
+        ? `Claude Code renewed its access token after ${after.waitedMs}ms.`
+        : `Renewal changed nothing in ${after.waitedMs}ms; the credential is still '${after.state}'.`,
     );
-    return after === 'ok';
+    return after.state === 'ok';
+  }
+
+  /**
+   * Re-read until the credential is usable, or the grace runs out.
+   *
+   * Process exit and the write that precedes it are not one event: a CLI may
+   * flush its credential store after the exit that `close` reports, and reading
+   * on that edge would call a renewal failed a few milliseconds before it
+   * succeeded. The elapsed time is logged because it is the only thing that
+   * distinguishes a write that arrived late from one that never came at all —
+   * and those have opposite conclusions.
+   */
+  private async settled(): Promise<{ state: string; waitedMs: number }> {
+    const startedAt = Date.now();
+
+    for (;;) {
+      const state = (await this.credentials.read()).state;
+      const waitedMs = Date.now() - startedAt;
+      if (state === 'ok' || waitedMs >= SETTLE_MS) {
+        return { state, waitedMs };
+      }
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
+    }
   }
 
   private run(executable: string): Promise<boolean> {
@@ -88,9 +115,21 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
         // project, and a directory the user has never opened in Claude Code is
         // one more thing that could stall.
         cwd: os.homedir(),
-        stdio: 'ignore',
+        // stdin stays closed — the CLI must never be able to wait on input here
+        // — but its own report is captured rather than discarded. It says
+        // whether it could see the credentials at all, which is the difference
+        // between a renewal that was refused and one that was never attempted,
+        // and no amount of reading the file afterwards recovers it.
+        stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });
+
+      let output = '';
+      const collect = (chunk: unknown): void => {
+        output += String(chunk);
+      };
+      child.stdout?.on('data', collect);
+      child.stderr?.on('data', collect);
 
       const timer = setTimeout(() => {
         killTree(child);
@@ -106,7 +145,9 @@ export class ClaudeCliRefresher implements ICredentialRefresher {
 
       child.once('close', (code) => {
         clearTimeout(timer);
-        this.logger.info(`${executable} doctor exited ${code} after ${Date.now() - startedAt}ms`);
+        this.logger.info(
+          `${executable} doctor exited ${code} after ${Date.now() - startedAt}ms\n${output.trim()}`,
+        );
         resolve(true);
       });
     });

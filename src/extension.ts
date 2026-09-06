@@ -96,19 +96,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /**
    * No refresher is wired in, and that is not an oversight.
    *
-   * `claude doctor` renews correctly when a person runs it in a terminal. Spawned
-   * from the extension host it redeems the refresh token and does not persist the
-   * replacement: it exits 0 after a genuine ~900ms run, leaves the credential
-   * file untouched and still stale, and the token it just spent is dead. Nothing
-   * downstream can see that — the file looks renewable — so the next process to
-   * use it is refused, and Claude Code blanks the store. The user is signed out
-   * by a dashboard.
+   * `claude doctor` renews a stale access token when a person runs it in a
+   * terminal. Spawned from the extension host it does not, and not for want of
+   * seeing the credential: it exits 0 after a genuine ~1000ms run, prints the
+   * authenticated form of every diagnostic it has, reports no installation
+   * issues — and writes nothing. Five seconds of re-reading afterwards find the
+   * credential exactly as stale as before.
    *
-   * Observed twice, reproducibly, against a real credential store. Which of the
-   * ignored stdio, the absent TTY or the host's environment causes it is not
-   * known, and the difference is not worth a login to find out. Until it is, a
-   * stale token waits for Claude Code to renew it, which is what that state was
-   * designed around. `vscode/claudeCliRefresher.ts` stays in the tree, unwired.
+   * The spawn shape is not the cause; the same arguments from an ordinary node
+   * process reach the credentials and report the same authenticated state. What
+   * differs between a terminal and this host is unknown, and answering it costs
+   * a login each attempt.
+   *
+   * So a stale token waits for Claude Code to renew it, which is what that state
+   * was designed around. `vscode/claudeCliRefresher.ts` stays in the tree with
+   * the instrumentation that established this; nothing constructs one.
    */
   const refresher = undefined;
 
