@@ -96,17 +96,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /**
    * No refresher is wired in, and that is not an oversight.
    *
-   * `claude doctor` renews a stale access token when a person runs it in a
-   * terminal. Spawned from the extension host it exits 0 after a genuine
-   * ~1000ms run and writes no credential — five seconds of re-reading afterwards
-   * find it exactly as stale as before. Why is unknown, and each attempt to find
-   * out costs a login.
+   * `claude doctor` renews a stale access token reliably when a person runs it
+   * in a terminal. Spawned from the extension host it did not: it exited 0 after
+   * a genuine ~1000ms run and wrote no credential, five seconds of re-reading
+   * finding the file exactly as stale as before. The login was dead by the next
+   * use, while the same credential backdated and left alone renews normally —
+   * so the call is implicated in the loss, on one observation each way.
+   *
+   * That is thin evidence for a claim about cause, and deliberately not the
+   * reason this is unwired. The reason is that it demonstrably does not renew
+   * from here, so there is nothing to weigh against even a suspected cost, and
+   * each further attempt to pin it down spends a login.
    *
    * **Its own output settles nothing.** It reports the API-dependent checks as
    * succeeding when the token is invalid and when the machine is offline alike,
-   * so a healthy-looking report is consistent with the CLI having reached
-   * nothing at all. The captured output below is for a human to read, never a
-   * signal to branch on — the credential on disk is the only evidence here.
+   * so a healthy report is consistent with it having reached nothing. The
+   * captured output is for a human to read, never a signal to branch on — the
+   * credential on disk is the only evidence here, and even that lags the damage.
    *
    * So a stale token waits for Claude Code to renew it, which is what that state
    * was designed around. `vscode/claudeCliRefresher.ts` stays in the tree with
