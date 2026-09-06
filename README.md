@@ -164,10 +164,10 @@ the dashboard.
 
 Between sessions the first figure reads `idle` rather than a stale percentage —
 there is no open window to be a percentage of, and your next message is what
-starts the next five hours. If you are not signed in, or Claude Code's session
-has expired, the item says which and changes colour, and the tooltip tells you
-what to do; tracking resumes by itself within three minutes of your signing back
-in. Turn the whole item off with
+starts the next five hours. If you are not signed in, the item says so and
+changes colour, and the tooltip tells you what to do; tracking resumes by itself
+within three minutes of your signing back in. An expired access token is
+refreshed for you. Turn the whole item off with
 `claudeUsageGraph.showStatusBar`.
 
 ---

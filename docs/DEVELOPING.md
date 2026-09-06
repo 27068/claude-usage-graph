@@ -587,7 +587,9 @@ npm run test:unit    # tsc -p ./ && mocha
 
 Plain mocha — no VS Code, no network, no display. That works because of the rule
 in section 2, and `architecture.test.ts` exists to keep it working. That file
-also asserts the auth layer has no write or refresh path, that
+also asserts the auth layer has no write or refresh path — renewal is asking
+Claude Code's own CLI to do it, from `src/vscode/claudeCliRefresher.ts`, and
+never something this codebase performs — that
 `dashboardPanel.ts` subscribes before assigning HTML (losing the `ready` message
 leaves the panel blank — this shipped once), and that every write goes through
 `atomicWrite`.
@@ -595,6 +597,21 @@ leaves the panel blank — this shipped once), and that every write goes through
 Note `test:unit` runs `tsc -p ./` only, so it does **not** rebuild the webview
 bundle. Tests passing tells you nothing about whether the chart on screen is
 current.
+
+### Never test auth against a copy of the credentials file
+
+Claude Code **rotates the refresh token on every refresh**, so two files holding
+the same one is not a fixture — it is a countdown. Whichever copy gets redeemed
+first retires the token in the other, and the loser is a login that can no longer
+be renewed. Pointing `HOME`/`USERPROFILE` at a copied `.credentials.json` looks
+like isolation and is not: it isolates the files, not the server, and the way it
+fails is the developer being signed out of Claude Code entirely.
+
+Two things follow. Edit `expiresAt` **in place** when you need a stale credential,
+so only one live copy ever exists. And do not read `refreshTokenExpiresAt` to
+decide whether rotation happened — it is anchored to the original grant and moves
+by about a millisecond across a rotation, so it reports "unchanged" while the
+token beside it is replaced. Compare the token value.
 
 ---
 
@@ -703,6 +720,20 @@ suite says nothing about whether the bundle on screen is current.
 ---
 
 ## 11. Releasing
+
+The order, once; the reasoning for each part is below.
+
+1. `npm version <x.y.z> --no-git-tag-version` — bump before packaging, since the
+   version is baked into the vsix filename and into what the Marketplace accepts.
+2. Add that version's entry to `CHANGELOG.md`. It is the listing's Changelog tab,
+   so it is release notes for strangers rather than a commit summary.
+3. `npm run test:unit`, then `npm run package`.
+4. Install the vsix and reload — section 5. Shipping one nobody has run is how a
+   stale bundle or a broken activation reaches the Marketplace, where the version
+   cannot be replaced.
+5. Commit the bump and the changelog together, and tag that commit.
+6. Push, tag included.
+7. Upload, by one of the two routes below.
 
 `npm run package` writes `claude-usage-graph-<version>.vsix`, and
 `vscode:prepublish` runs the full compile first, so the vsix cannot carry a stale

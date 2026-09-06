@@ -41,6 +41,23 @@ export interface ICredentialStore {
   read(): Promise<CredentialResult>;
 }
 
+/**
+ * Asks Claude Code to renew its own access token, rather than renewing one here.
+ *
+ * The distinction `ICredentialStore` protects is preserved: we still hold no
+ * token, mint nothing and write nothing. We start Claude Code, which renews as
+ * part of its own startup and writes its own credential file — the same thing
+ * that happens when the user opens a terminal and types `claude`.
+ *
+ * It is not free of consequence. Every renewal rotates the refresh token, so a
+ * copy of the credential taken beforehand is dead the moment this returns.
+ * Nothing here keeps such a copy, and nothing should.
+ */
+export interface ICredentialRefresher {
+  /** True when the credential on disk came back renewed. Never throws. */
+  refresh(): Promise<boolean>;
+}
+
 /** Throws `PollError` on any failure; never returns a partial snapshot. */
 export interface IUsagePoller {
   poll(): Promise<UsageSnapshot>;

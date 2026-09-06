@@ -496,8 +496,9 @@ function showStatus(message: HostMessage & { type: 'status' }): void {
   const friendly: Record<string, string> = {
     ok: '',
     mock: 'Showing synthetic development data.',
-    'no-credentials': 'Claude Code credentials not found. Run `claude` in a terminal and sign in, then reload.',
-    'auth-error': 'Your Claude Code session has expired. Run `claude` to sign in again.',
+    'no-credentials': 'Claude Code credentials not found. Run `claude` in a terminal and sign in.',
+    'stale-token': 'Renewing the Claude Code access token.',
+    'auth-error': 'Anthropic refused the Claude Code credential.',
     'rate-limited': 'Anthropic is rate limiting requests; backing off.',
     'network-error': 'Could not reach Anthropic.',
   };

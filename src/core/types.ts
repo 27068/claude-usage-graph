@@ -91,7 +91,25 @@ export type SampleOutcome =
    *  indistinguishable from a dead-zone break row. */
   | { kind: 'skipped' };
 
-export type PollFailureKind = 'no-credentials' | 'auth-error' | 'rate-limited' | 'network-error';
+/**
+ * `stale-token` and `auth-error` look alike and are not.
+ *
+ * A stale token is the ordinary state of a machine nobody has used for eight
+ * hours: Claude Code renews it on its next start, and running its CLI is enough
+ * to force that without spending a single inference token. Nothing is wrong, so
+ * nothing is reported as wrong.
+ *
+ * `auth-error` is the endpoint refusing a credential that was locally valid.
+ * Refreshing cannot fix that, which is why the two must never share a branch —
+ * a refresher wired to this one would spawn a CLI against a revoked login on
+ * every tick.
+ */
+export type PollFailureKind =
+  | 'no-credentials'
+  | 'stale-token'
+  | 'auth-error'
+  | 'rate-limited'
+  | 'network-error';
 
 export type StatusState = 'ok' | 'mock' | PollFailureKind;
 
@@ -107,10 +125,20 @@ export class PollError extends Error {
   }
 }
 
-/** Result of reading Claude Code's credential store. We only ever read. */
+/**
+ * Result of reading Claude Code's credential store. We only ever read.
+ *
+ * `stale` and `signed-out` are both "the access token has expired", separated by
+ * the one field that says whether Claude Code can still renew it on its own.
+ * The distinction is made here, where the fields are, rather than downstream:
+ * only this module knows the skew and the two encodings of an expiry.
+ */
 export type CredentialResult =
   | { state: 'ok'; token: string; expiresAt: Millis }
-  | { state: 'expired'; expiresAt: Millis }
+  /** Access token expired, refresh token still good — Claude Code will renew. */
+  | { state: 'stale'; expiresAt: Millis }
+  /** The refresh token has expired as well. Nothing short of signing in helps. */
+  | { state: 'signed-out'; expiresAt: Millis }
   | { state: 'missing' }
   | { state: 'malformed'; reason: string };
 

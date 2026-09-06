@@ -71,10 +71,31 @@ describe('statusBarModel', () => {
     assert.strictEqual(model.severity, 'none');
   });
 
+  it('does not colour a stale token as a fault', () => {
+    // Eight hours without opening Claude Code is not an error, and the refresher
+    // clears it within a tick. Red here would fire only while nobody is using
+    // the thing being measured, and stand down the moment they are.
+    const stale = statusBarModel(inputs({ status: { state: 'stale-token' } }));
+
+    assert.strictEqual(stale.severity, 'none');
+    assert.ok(!/sign in/i.test(stale.tooltip), 'nobody needs to sign in for this');
+  });
+
+  it('tells a rejected credential apart from an expired one', () => {
+    // The actionable half of the two expiry states, and the one that must never
+    // reach the refresher.
+    const rejected = statusBarModel(
+      inputs({ status: { state: 'auth-error', message: 'Usage endpoint rejected the token (401)' } }),
+    );
+
+    assert.strictEqual(rejected.severity, 'error');
+    assert.ok(rejected.tooltip.includes('401'), rejected.tooltip);
+  });
+
   it('escalates a failed poll over whatever the numbers said', () => {
-    const expired = statusBarModel(inputs({ status: { state: 'auth-error' } }));
-    assert.strictEqual(expired.severity, 'error');
-    assert.ok(!expired.label.includes('42%'), 'a failure state replaces the readings');
+    const rejected = statusBarModel(inputs({ status: { state: 'auth-error' } }));
+    assert.strictEqual(rejected.severity, 'error');
+    assert.ok(!rejected.label.includes('42%'), 'a failure state replaces the readings');
 
     const missing = statusBarModel(inputs({ status: { state: 'no-credentials' } }));
     assert.strictEqual(missing.severity, 'warning');
@@ -89,8 +110,11 @@ describe('statusBarModel', () => {
   // people to reload therefore bought them nothing and implied that waiting
   // would not work. Both auth states must instead name the bound they resume
   // within, which is one poll interval.
-  it('tells both auth states how long a resume takes, and never to reload', () => {
-    for (const state of ['no-credentials', 'auth-error'] as const) {
+  // `auth-error` is deliberately not in this list. A resume promise belongs to
+  // the states that resolve on their own — signing in, or a renewal — and the
+  // endpoint refusing a valid credential is neither.
+  it('tells the recoverable auth states how long a resume takes, and never to reload', () => {
+    for (const state of ['no-credentials', 'stale-token'] as const) {
       const { tooltip } = statusBarModel(inputs({ status: { state } }));
 
       assert.ok(/resumes on its own within \d+ minutes/.test(tooltip), tooltip);

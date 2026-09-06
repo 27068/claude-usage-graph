@@ -43,11 +43,13 @@ export class HttpUsagePoller implements IUsagePoller {
         throw new PollError('no-credentials', 'Claude Code credentials were not found');
       case 'malformed':
         throw new PollError('no-credentials', `Credential store unreadable: ${credential.reason}`);
-      case 'expired':
+      case 'signed-out':
         throw new PollError(
-          'auth-error',
-          'The Claude Code session token has expired. Run `claude` to sign in again.',
+          'no-credentials',
+          'The Claude Code login has expired. Run `claude` in a terminal and sign in.',
         );
+      case 'stale':
+        throw new PollError('stale-token', 'The Claude Code access token needs renewing');
       default:
         break;
     }

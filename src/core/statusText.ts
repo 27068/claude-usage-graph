@@ -20,14 +20,14 @@ const MINUTE_MS = 60_000;
 const SEPARATOR = ' · ';
 
 /**
- * What both authentication tooltips promise, and why they can promise it.
+ * What the authentication tooltips promise, and why they can promise it.
  *
- * The credential is re-read on every poll and a missing or expired one costs no
- * network call, so `usageEngine.handleFailure` deliberately does *not* back off
- * for either state — the cadence stays flat and the next tick is at most one
- * interval away. That bound is the whole message: without it the reader is told
- * to sign in and then left with no idea whether to wait or to go looking for a
- * button.
+ * The credential is re-read on every poll and a missing, stale or dead one costs
+ * no network call, so `usageEngine.handleFailure` deliberately does *not* back
+ * off for any of those states — the cadence stays flat and the next tick is at
+ * most one interval away. That bound is the whole message: without it the reader
+ * is told to sign in and then left with no idea whether to wait or to go looking
+ * for a button.
  *
  * Rounded up, because a ceiling that overstates the wait by seconds is honest
  * and one that understates it is not. Saying "no reload needed" is worth the
@@ -111,11 +111,25 @@ export function statusBarModel(inputs: StatusBarInputs): StatusBarModel {
         severity: 'warning',
       };
 
+    // An access token lasts eight hours, so this is what a machine looks like
+    // after a night off. The refresher renews it and the next tick reads
+    // through, which is why it carries no severity.
+    case 'stale-token':
+      return {
+        icon: 'sync',
+        label: 'Claude: renewing',
+        tooltip: `The Claude Code access token has expired and is being renewed.\n${RESUME_PHRASE}`,
+        severity: 'none',
+      };
+
+    // The endpoint refused a credential that had *not* expired. Renewing cannot
+    // help, which is what separates this from the case above and why it keeps
+    // the error colour.
     case 'auth-error':
       return {
         icon: 'error',
-        label: 'Claude: session expired',
-        tooltip: `The Claude Code session token has expired. Run \`claude\` to sign in again.\n${RESUME_PHRASE}`,
+        label: 'Claude: rejected',
+        tooltip: status.message ?? 'Anthropic refused the Claude Code credential.',
         severity: 'error',
       };
 

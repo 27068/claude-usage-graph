@@ -84,7 +84,11 @@ export class CredentialReader implements ICredentialStore {
       return { state: 'malformed', reason: 'no claudeAiOauth section' };
     }
 
-    const { accessToken, expiresAt } = oauth as { accessToken?: unknown; expiresAt?: unknown };
+    const { accessToken, expiresAt, refreshTokenExpiresAt } = oauth as {
+      accessToken?: unknown;
+      expiresAt?: unknown;
+      refreshTokenExpiresAt?: unknown;
+    };
     if (typeof accessToken !== 'string' || accessToken.length === 0) {
       return { state: 'malformed', reason: 'no access token' };
     }
@@ -94,7 +98,15 @@ export class CredentialReader implements ICredentialStore {
 
     const expiry = normalizeExpiry(expiresAt);
     if (expiry - EXPIRY_SKEW_MS <= this.clock.now()) {
-      return { state: 'expired', expiresAt: expiry };
+      // An absent refresh expiry is treated as renewable. Getting this wrong in
+      // that direction costs one CLI start; the other direction puts a sign-in
+      // prompt in front of somebody who is already signed in.
+      const refreshExpiry =
+        typeof refreshTokenExpiresAt === 'number' && Number.isFinite(refreshTokenExpiresAt)
+          ? normalizeExpiry(refreshTokenExpiresAt)
+          : undefined;
+      const renewable = refreshExpiry === undefined || refreshExpiry > this.clock.now();
+      return { state: renewable ? 'stale' : 'signed-out', expiresAt: expiry };
     }
 
     return { state: 'ok', token: accessToken, expiresAt: expiry };

@@ -11,6 +11,7 @@ import { PollSchedule } from './core/pollSchedule';
 import { addLocalDays, startOfLocalDay } from './core/sessions';
 import { POLL_INTERVAL_MS, UsageEngine } from './core/usageEngine';
 import type { LedgerUpdatedEvent, Meta, StatusEvent } from './core/types';
+import { ClaudeCliRefresher } from './vscode/claudeCliRefresher';
 import { DashboardPanel, VIEW_TYPE } from './vscode/dashboardPanel';
 import { HttpUsagePoller } from './vscode/httpUsagePoller';
 import { MockUsagePoller } from './vscode/mockUsagePoller';
@@ -91,7 +92,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const mockPoller = useMock
     ? new MockUsagePoller(fixtureRoot, clock, logger, fixtureFile, fixtureBase)
     : undefined;
-  const poller = mockPoller ?? new HttpUsagePoller(new CredentialReader(clock, logger), clock, logger);
+  const credentials = new CredentialReader(clock, logger);
+  const poller = mockPoller ?? new HttpUsagePoller(credentials, clock, logger);
+  // Mock mode reads no credential and so can never report one stale; giving it a
+  // refresher would only add a way to start a CLI that fixes nothing.
+  const refresher = useMock ? undefined : new ClaudeCliRefresher(credentials, logger);
 
   if (useMock) {
     logger.info(`Running with synthetic fixture data (development mode, ${fixtureFile})`);
@@ -115,6 +120,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           .get<number>('retentionDays', RETENTION_DAYS),
       ),
     },
+    refresher,
   );
 
   // Track the most recent meta and status so a panel opened later hydrates with

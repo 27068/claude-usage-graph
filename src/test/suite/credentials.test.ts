@@ -22,6 +22,12 @@ function validPayload(expiresAt: number) {
   };
 }
 
+function withRefreshExpiry(expiresAt: number, refreshTokenExpiresAt: number) {
+  return {
+    claudeAiOauth: { ...validPayload(expiresAt).claudeAiOauth, refreshTokenExpiresAt },
+  };
+}
+
 function readerFor(contents: string | Error, platform: NodeJS.Platform = 'win32') {
   const clock = new FakeClock(NOW);
   const logger = new RecordingLogger();
@@ -68,12 +74,30 @@ describe('CredentialReader', () => {
     const { reader } = readerFor(store(validPayload(NOW - HOUR)));
     const result = await reader.read();
 
-    assert.strictEqual(result.state, 'expired');
+    assert.strictEqual(result.state, 'stale');
+  });
+
+  it('separates a renewable token from a login that is actually over', async () => {
+    // The same expired access token twice. Only the refresh expiry differs, and
+    // it is the whole difference between "wait" and "go and sign in".
+    const live = readerFor(store(withRefreshExpiry(NOW - HOUR, NOW + 20 * 24 * HOUR)));
+    assert.strictEqual((await live.reader.read()).state, 'stale');
+
+    const dead = readerFor(store(withRefreshExpiry(NOW - HOUR, NOW - HOUR)));
+    assert.strictEqual((await dead.reader.read()).state, 'signed-out');
+  });
+
+  it('treats an absent refresh expiry as renewable', async () => {
+    // Claude Code has not always written the field. Guessing "signed out" here
+    // would put a sign-in prompt in front of someone who is signed in; guessing
+    // the other way costs one CLI start that finds nothing to do.
+    const { reader } = readerFor(store(validPayload(NOW - HOUR)));
+    assert.strictEqual((await reader.read()).state, 'stale');
   });
 
   it('treats a token inside the skew window as already expired', async () => {
     const { reader } = readerFor(store(validPayload(NOW + EXPIRY_SKEW_MS - 1)));
-    assert.strictEqual((await reader.read()).state, 'expired');
+    assert.strictEqual((await reader.read()).state, 'stale');
   });
 
   it('accepts a token just outside the skew window', async () => {
@@ -92,7 +116,7 @@ describe('CredentialReader', () => {
       readFile: async () => contents,
     });
 
-    assert.strictEqual((await reader.read()).state, 'expired');
+    assert.strictEqual((await reader.read()).state, 'stale');
 
     // Claude Code refreshes; we notice on the very next read with no action of
     // our own. This is the entire renewal mechanism.
