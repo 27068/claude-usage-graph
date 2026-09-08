@@ -20,6 +20,13 @@ const MINUTE_MS = 60_000;
 const SEPARATOR = ' · ';
 
 /**
+ * What a column shows with nothing behind it. Named because two callers need to
+ * agree on it: `percent` reaches it from a missing value, and the weekly column
+ * reaches it from a boundary that has passed.
+ */
+const NO_READING = '—';
+
+/**
  * What both authentication tooltips promise, and why they can promise it.
  *
  * The credential is re-read on every poll and a missing or expired one costs no
@@ -60,6 +67,12 @@ export interface StatusBarInputs {
    */
   fiveResetAt: Millis | null;
   sevenResetAt: Millis | null;
+  /**
+   * Whether a poll actually found no five-hour window, as opposed to our never
+   * having looked. Read only when `fiveResetAt` is null, and the difference
+   * between saying `idle` and admitting to a dash.
+   */
+  fiveIdleObserved: boolean;
 }
 
 export function statusBarModel(inputs: StatusBarInputs): StatusBarModel {
@@ -68,21 +81,45 @@ export function statusBarModel(inputs: StatusBarInputs): StatusBarModel {
   switch (status.state) {
     case 'ok':
     case 'mock': {
-      // A five-hour pool exists only while a session is open. Once the window
-      // has closed the newest file's last sample describes a pool that is gone,
-      // so the percentage has to go with the countdown — left in place it sits
-      // there looking live, and the only hint that it is stale would be a
-      // countdown that quietly vanished from beside it.
+      // A five-hour pool exists only while a session is open, so this column has
+      // three states rather than two. Either way the percentage cannot outlive
+      // the window: the newest file's last sample describes a pool that is gone,
+      // so it goes with the countdown — left in place it sits there looking
+      // live, and the only hint that it is stale would be a countdown that
+      // quietly vanished from beside it.
       //
-      // `idle` rather than a dash, because a dash already means "no reading" and
-      // this is the opposite: the reading is that there is no window. It is also
-      // the actionable state — the next message opens a fresh pool, and the
-      // reader gets to choose when those five hours start.
+      // `idle` is a reading, not the lack of one, which is what earns it a word
+      // where a dash would say the opposite. It is also the actionable state —
+      // the next message opens a fresh pool, and the reader gets to choose when
+      // those five hours start. So it is spent only on the evidence that backs
+      // it: a poll that came back with no five-hour window at all. Absent that
+      // evidence the honest reading is the dash, because before the first poll
+      // lands there is nothing to distinguish a closed pool from an open one we
+      // have not looked at.
       const open = inputs.fiveResetAt !== null;
+      const idle = !open && inputs.fiveIdleObserved;
       const five = open
         ? `${percent(inputs.five)}${remaining(inputs.fiveResetAt, now)}`
-        : 'idle';
-      const seven = `${percent(inputs.seven)}${remaining(inputs.sevenResetAt, now)}`;
+        : idle
+          ? 'idle'
+          : NO_READING;
+      const fiveTooltip = open
+        ? `Session Usage: ${percent(inputs.five)}${resetPhrase(inputs.fiveResetAt)}`
+        : idle
+          ? 'Session Usage: no active session; your next message opens a new 5-hour window'
+          : 'Session Usage: no reading yet; the next poll reports the current session';
+
+      // A weekly allowance runs whether or not anyone is working, so it has no
+      // `idle` counterpart: a null boundary here does not mean the window is
+      // gone, it means the week we recorded has ended and no poll has yet named
+      // its successor. Both readings we could show are wrong — the old week's
+      // percentage measures an allowance that no longer exists, and the new
+      // week's is unobserved, so zero would be inventing a measurement rather
+      // than showing one. The dash already means "no reading", which is exactly
+      // the state, and the next poll replaces it.
+      const weekKnown = inputs.sevenResetAt !== null;
+      const sevenPercent = weekKnown ? percent(inputs.seven) : NO_READING;
+      const seven = `${sevenPercent}${remaining(inputs.sevenResetAt, now)}`;
 
       return {
         icon: 'graph-line',
@@ -93,10 +130,10 @@ export function statusBarModel(inputs: StatusBarInputs): StatusBarModel {
           status.state === 'mock'
             ? 'Synthetic development data'
             : [
-                open
-                  ? `Session Usage: ${percent(inputs.five)}${resetPhrase(inputs.fiveResetAt)}`
-                  : 'Session Usage: no active session; your next message opens a new 5-hour window',
-                `Weekly Usage: ${percent(inputs.seven)}${resetPhrase(inputs.sevenResetAt)}`,
+                fiveTooltip,
+                weekKnown
+                  ? `Weekly Usage: ${sevenPercent}${resetPhrase(inputs.sevenResetAt)}`
+                  : 'Weekly Usage: no reading yet; the next poll reports the current week',
                 'Click to open the dashboard',
               ].join('\n'),
         severity: 'none',
@@ -160,7 +197,7 @@ export function lastValue(file: LedgerFile | undefined, column: number): number 
 }
 
 function percent(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}%`;
+  return value === null ? NO_READING : `${Math.round(value)}%`;
 }
 
 /** The countdown, with its leading space — or nothing at all when unknown. */

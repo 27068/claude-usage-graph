@@ -419,6 +419,7 @@ export class UsageEngine {
       now,
       fiveResetAt: openReset(this.lastSnapshot?.fiveHour.resetsAt, newest.five_hour, now),
       sevenResetAt: openReset(this.lastSnapshot?.sevenDay.resetsAt, newest.seven_day, now),
+      fiveIdleObserved: observedIdle(this.lastSnapshot, newest),
       tzOffsetMinutes: new Date(now).getTimezoneOffset(),
       mock: this.options.mock === true,
     };
@@ -451,6 +452,40 @@ function openReset(
     }
   }
   return null;
+}
+
+/**
+ * Whether we have actually seen that no five-hour pool is open, as against
+ * simply not knowing.
+ *
+ * `openReset` returning null does not settle this. A window that has never
+ * polled lands there, and so does one whose last poll reported a boundary that
+ * has since passed — in both the pool may well be open and unobserved. Only a
+ * poll that came back without a five-hour window is evidence, and the API does
+ * give one: it reports `five_hour: null` once the pool lapses with nothing run
+ * inside it, rather than a window zeroed out. See `normalize.ts`.
+ *
+ * A window that never polls has to read the same evidence off the ledger, or the
+ * second VS Code window could never say `idle` at all. `record` writes a week
+ * row on every poll but a session row only while a pool exists, so a week sample
+ * later than the newest session file's boundary is a poll that found no pool —
+ * and week rows with no session file beside them mean no poll has ever found
+ * one.
+ */
+function observedIdle(
+  live: UsageSnapshot | undefined,
+  newest: Record<'five_hour' | 'seven_day', LedgerFile | undefined>,
+): boolean {
+  if (live !== undefined) {
+    return live.fiveHour.resetsAt === null;
+  }
+  const samples = newest.seven_day?.samples;
+  const lastWeekSample = samples === undefined ? undefined : samples[samples.length - 1]?.[0];
+  if (lastWeekSample === undefined) {
+    return false;
+  }
+  const session = newest.five_hour;
+  return session === undefined || lastWeekSample > session.resetAt;
 }
 
 function seedFile(kind: 'five_hour' | 'seven_day', startAt: Millis, resetAt: Millis): LedgerFile {

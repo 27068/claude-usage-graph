@@ -136,10 +136,18 @@ export function snapshotAt(
     models?: Record<string, number | null>;
   } = {},
 ): UsageSnapshot {
+  // Omitted falls back, but an explicit null is kept: `null` is the shape the
+  // endpoint actually sends for a window that has lapsed, so a test that cannot
+  // say it cannot reach the code that reads it.
+  const or = <T>(value: T | undefined, fallback: T): T => (value === undefined ? fallback : value);
+
   return {
     at,
-    fiveHour: { utilization: options.five ?? 10, resetsAt: options.fiveReset ?? at + 3_600_000 },
-    sevenDay: { utilization: options.seven ?? 20, resetsAt: options.sevenReset ?? at + 86_400_000 },
+    fiveHour: { utilization: or(options.five, 10), resetsAt: or(options.fiveReset, at + 3_600_000) },
+    sevenDay: {
+      utilization: or(options.seven, 20),
+      resetsAt: or(options.sevenReset, at + 86_400_000),
+    },
     models: Object.entries(options.models ?? {}).map(([key, utilization]) => ({
       key,
       window: { utilization, resetsAt: null },

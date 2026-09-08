@@ -38,6 +38,8 @@ export class UsageStatusBar implements IDisposable {
   private readonly timer: ReturnType<typeof setInterval>;
   private latest: { five: number | null; seven: number | null } = { five: null, seven: null };
   private resets: { five: Millis | null; seven: Millis | null } = { five: null, seven: null };
+  /** False until a poll settles it, so a bar that has never polled shows a dash. */
+  private fiveIdleObserved = false;
   private status: StatusEvent = { state: 'ok' };
 
   constructor(
@@ -72,6 +74,7 @@ export class UsageStatusBar implements IDisposable {
       seven: lastValue(event.newest.seven_day, 0),
     };
     this.resets = { five: event.meta.fiveResetAt, seven: event.meta.sevenResetAt };
+    this.fiveIdleObserved = event.meta.fiveIdleObserved;
     this.render();
   }
 
@@ -88,6 +91,7 @@ export class UsageStatusBar implements IDisposable {
       seven: this.latest.seven,
       fiveResetAt: this.resets.five,
       sevenResetAt: this.resets.seven,
+      fiveIdleObserved: this.fiveIdleObserved,
     };
     const model = statusBarModel(inputs);
     const color = SEVERITY_COLOR[model.severity];

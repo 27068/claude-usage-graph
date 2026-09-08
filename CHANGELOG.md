@@ -8,10 +8,10 @@
   the new day and leaving the open session on the page behind.
 - **Neither meter reports a window it can no longer see.** A weekly allowance
   that has reset, and a session pool that has closed since the last poll, now
-  read as a dash instead of holding up the last percentage they happened to
-  show — which looked live and was not. Session Usage says `idle` only where a
-  poll has actually found no session open, rather than wherever the extension
-  has not looked yet.
+  read as a dash rather than continuing to show the percentage they last
+  reported, which looked current and was not. Session Usage says `idle` only
+  when a poll has found no session open, not whenever the extension has not
+  looked.
 
 ## 1.0.1
 

@@ -186,8 +186,13 @@ describe('test scenarios', () => {
       assert.ok(gap > 2 * 60 * MINUTE, `expected a multi-hour gap, got ${gap / MINUTE} minutes`);
     });
 
+    // The fixture's last frames carry `five: null, fiveResetMin: null`, which is
+    // what the endpoint sends once a pool lapses. That is the evidence `idle`
+    // rests on, so asserting it here checks the whole path — payload, engine,
+    // meta, bar — rather than the wording alone.
     it('reports no open pool, so the status bar goes idle', () => {
       assert.strictEqual(result.meta.fiveResetAt, null);
+      assert.strictEqual(result.meta.fiveIdleObserved, true, 'a poll saw the pool absent');
 
       const model = statusBarModel({
         status: result.status ?? { state: 'mock' },
@@ -196,6 +201,7 @@ describe('test scenarios', () => {
         seven: 19,
         fiveResetAt: result.meta.fiveResetAt,
         sevenResetAt: result.meta.sevenResetAt,
+        fiveIdleObserved: result.meta.fiveIdleObserved,
       });
       assert.ok(model.label.startsWith('idle'), model.label);
     });
@@ -295,6 +301,7 @@ describe('test scenarios', () => {
         seven: 19,
         fiveResetAt: result.meta.fiveResetAt,
         sevenResetAt: result.meta.sevenResetAt,
+        fiveIdleObserved: result.meta.fiveIdleObserved,
       });
       assert.ok(!model.label.includes('idle'), model.label);
       assert.ok(model.label.startsWith('41%'), model.label);

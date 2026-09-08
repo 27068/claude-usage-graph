@@ -123,6 +123,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     now: clock.now(),
     fiveResetAt: null,
     sevenResetAt: null,
+    fiveIdleObserved: false,
     tzOffsetMinutes: new Date().getTimezoneOffset(),
     mock: useMock,
   };

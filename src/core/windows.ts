@@ -27,8 +27,12 @@ const HOUR = 3_600_000;
 export const FIVE_HOUR_MS = 5 * HOUR;
 
 /**
- * A weekly allowance. Runs whether or not anyone is working, which is what makes
- * it safe to project forward across a gap — see `selectors.currentCycleReset`.
+ * A weekly allowance. Runs whether or not anyone is working, which is what lets
+ * `selectors.liveFrameEnd` step a recorded boundary forward in whole weeks to
+ * find the live page's edge. Note that this licenses stepping the *frame*, not
+ * claiming a cycle: it says a week is always running, never that the one running
+ * now is seven days long. It is also why the status bar has no `idle` state for
+ * this window, only a dash — see `statusText.statusBarModel`.
  */
 export const WEEK_MS = 7 * 24 * HOUR;
 

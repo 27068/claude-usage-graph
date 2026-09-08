@@ -397,6 +397,55 @@ describe('UsageEngine', () => {
     assert.strictEqual(meta.sevenResetAt, sevenReset, 'read from the week file header');
   });
 
+  // `fiveResetAt: null` alone cannot carry this: it is equally what a window
+  // that has not polled reports, and the bar must not say `idle` on that.
+  it('separates a pool seen to be absent from one never looked at', async () => {
+    const sevenReset = NOW + 3 * 86_400_000;
+    const engine = build(
+      new StubPoller().push(
+        snapshotAt(NOW, { fiveReset: NOW + HOUR, sevenReset }),
+        snapshotAt(NOW + 2 * HOUR, { five: null, fiveReset: null, seven: 21, sevenReset }),
+      ),
+      'leader',
+    );
+
+    await engine.start();
+    assert.strictEqual(updates.received.at(-1)?.meta.fiveIdleObserved, false, 'a pool was reported');
+
+    clock.set(NOW + 2 * HOUR);
+    await engine.tick({ force: true });
+
+    const { meta } = updates.received[updates.received.length - 1];
+    assert.strictEqual(meta.fiveResetAt, null);
+    assert.strictEqual(meta.fiveIdleObserved, true, 'the poll came back with no pool at all');
+  });
+
+  // The follower never polls, so it has no snapshot to read this off and must
+  // recover it from the files: the leader kept extending the week past the
+  // session file's boundary without opening a new one.
+  it('recovers an absent pool from the ledger when another window is polling', async () => {
+    const sevenReset = NOW + 3 * 86_400_000;
+    const leader = build(
+      new StubPoller().push(
+        snapshotAt(NOW, { fiveReset: NOW + HOUR, sevenReset }),
+        snapshotAt(NOW + 2 * HOUR, { five: null, fiveReset: null, seven: 21, sevenReset }),
+      ),
+      'leader',
+    );
+    await leader.start();
+    clock.set(NOW + 2 * HOUR);
+    await leader.tick({ force: true });
+    updates.received.length = 0;
+
+    const follower = new StubPoller(snapshotAt(NOW + 2 * HOUR, { sevenReset }));
+    await build(follower, 'follower').start();
+
+    assert.strictEqual(follower.calls, 0, 'the follower must not poll');
+    const { meta } = updates.received[0];
+    assert.strictEqual(meta.fiveResetAt, null);
+    assert.strictEqual(meta.fiveIdleObserved, true, 'derived from the files alone');
+  });
+
   it('does not report a reset boundary that has already passed', async () => {
     await build(new StubPoller(snapshotAt(NOW, { fiveReset: NOW + HOUR })), 'leader').start();
     updates.received.length = 0;

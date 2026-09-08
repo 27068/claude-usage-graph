@@ -19,6 +19,9 @@ function inputs(overrides: Partial<StatusBarInputs> = {}): StatusBarInputs {
     seven: 19,
     fiveResetAt: NOW + 2 * HOUR,
     sevenResetAt: NOW + 3 * 24 * HOUR,
+    // The base case is a live session, where a poll reported a window rather
+    // than the absence of one. Tests that mean `idle` opt into it by name.
+    fiveIdleObserved: false,
     ...overrides,
   };
 }
@@ -33,27 +36,73 @@ describe('statusBarModel', () => {
   });
 
   // The newest session file's last sample outlives the window it describes, so
-  // after a reset the bar would report a pool that has gone. A null boundary is
-  // the signal that it has closed.
+  // after a reset the bar would report a pool that has gone. It takes both
+  // signals to say so: a null boundary, and a poll that saw the pool absent.
   it('reports an expired pool as idle rather than repeating its last percentage', () => {
-    const model = statusBarModel(inputs({ five: 3, fiveResetAt: null }));
+    const model = statusBarModel(inputs({ five: 3, fiveResetAt: null, fiveIdleObserved: true }));
 
     assert.ok(!model.label.includes('3%'), `a closed pool must not report a value: ${model.label}`);
     assert.strictEqual(model.label, 'idle · 19% 3d 0h');
   });
 
   it('says what idle means, and what to do about it, in the tooltip', () => {
-    const model = statusBarModel(inputs({ five: 3, fiveResetAt: null }));
+    const model = statusBarModel(inputs({ five: 3, fiveResetAt: null, fiveIdleObserved: true }));
 
     assert.ok(model.tooltip.includes('no active session'), model.tooltip);
     assert.ok(!model.tooltip.includes('Session Usage: 3%'), 'the stale figure must not survive here either');
   });
 
   it('leaves the weekly window alone when only the pool has closed', () => {
-    const model = statusBarModel(inputs({ fiveResetAt: null }));
+    const model = statusBarModel(inputs({ fiveResetAt: null, fiveIdleObserved: true }));
 
     assert.ok(model.label.endsWith('19% 3d 0h'), model.label);
     assert.ok(model.tooltip.includes('Weekly Usage: 19%'), model.tooltip);
+  });
+
+  // `idle` is a claim that the API reported no pool. Before the first poll lands
+  // the bar holds no boundary either, and asserting it there would be inventing
+  // the reading rather than reporting one.
+  it('dashes an unobserved pool instead of guessing that it is idle', () => {
+    const model = statusBarModel(inputs({ five: 3, fiveResetAt: null, fiveIdleObserved: false }));
+
+    assert.strictEqual(model.label, '— · 19% 3d 0h');
+    assert.ok(!model.label.includes('idle'), model.label);
+    assert.ok(!model.label.includes('3%'), `a pool we cannot see must not report a value: ${model.label}`);
+  });
+
+  it('does not promise a fresh 5-hour window it has no evidence has closed', () => {
+    const model = statusBarModel(inputs({ fiveResetAt: null, fiveIdleObserved: false }));
+
+    assert.ok(!model.tooltip.includes('no active session'), model.tooltip);
+    assert.ok(model.tooltip.includes('Session Usage: no reading yet'), model.tooltip);
+  });
+
+  // The weekly file outlives its cycle exactly as the session file does, so
+  // between the boundary passing and the next poll landing the last sample
+  // measures an allowance that has already been replaced.
+  it('reports an ended week as a dash rather than repeating its last percentage', () => {
+    const model = statusBarModel(inputs({ seven: 79, sevenResetAt: null }));
+
+    assert.ok(!model.label.includes('79%'), `an ended week must not report a value: ${model.label}`);
+    assert.strictEqual(model.label, '42% 2h 0m · —');
+  });
+
+  // A week always runs, so its expiry is a missing reading and never `idle` —
+  // and never zero, which we have not observed and cannot derive.
+  it('never calls an ended week idle, and never invents a zero for it', () => {
+    const model = statusBarModel(inputs({ seven: 79, sevenResetAt: null }));
+
+    assert.ok(!model.label.includes('idle'), model.label);
+    assert.ok(!model.label.includes('0%'), model.label);
+    assert.ok(!model.tooltip.includes('Weekly Usage: 79%'), 'the stale figure must not survive here either');
+    assert.ok(model.tooltip.includes('no reading yet'), model.tooltip);
+  });
+
+  it('leaves the pool alone when only the week has ended', () => {
+    const model = statusBarModel(inputs({ sevenResetAt: null }));
+
+    assert.ok(model.label.startsWith('42% 2h 0m'), model.label);
+    assert.ok(model.tooltip.includes('Session Usage: 42%'), model.tooltip);
   });
 
   it('distinguishes a missing reading from a closed window', () => {

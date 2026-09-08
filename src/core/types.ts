@@ -119,6 +119,13 @@ export interface Meta {
   now: Millis;
   fiveResetAt: Millis | null;
   sevenResetAt: Millis | null;
+  /**
+   * Whether the absence of a five-hour window was *seen*, rather than merely not
+   * ruled out. Only meaningful while `fiveResetAt` is null, which on its own
+   * says nothing: a window that has not polled yet lands there too. See
+   * `usageEngine.observedIdle`.
+   */
+  fiveIdleObserved: boolean;
   tzOffsetMinutes: number;
   mock: boolean;
 }
