@@ -27,14 +27,14 @@ const SEPARATOR = ' · ';
 const NO_READING = '—';
 
 /**
- * What both authentication tooltips promise, and why they can promise it.
+ * What the authentication tooltips promise, and why they can promise it.
  *
- * The credential is re-read on every poll and a missing or expired one costs no
- * network call, so `usageEngine.handleFailure` deliberately does *not* back off
- * for either state — the cadence stays flat and the next tick is at most one
- * interval away. That bound is the whole message: without it the reader is told
- * to sign in and then left with no idea whether to wait or to go looking for a
- * button.
+ * The credential is re-read on every poll and a missing, stale or dead one costs
+ * no network call, so `usageEngine.handleFailure` deliberately does *not* back
+ * off for any of those states — the cadence stays flat and the next tick is at
+ * most one interval away. That bound is the whole message: without it the reader
+ * is told to sign in and then left with no idea whether to wait or to go looking
+ * for a button.
  *
  * Rounded up, because a ceiling that overstates the wait by seconds is honest
  * and one that understates it is not. Saying "no reload needed" is worth the
@@ -148,11 +148,82 @@ export function statusBarModel(inputs: StatusBarInputs): StatusBarModel {
         severity: 'warning',
       };
 
+    // Signed in, with the credential in a store this cannot read — Windows
+    // Credential Manager, reached through an API no Node process has.
+    //
+    // The only state that offers no action, and it must not borrow one from the
+    // states either side. Signing in and using Claude Code both write back to
+    // the same store, so either instruction would send somebody round a loop
+    // that cannot terminate. It also cannot claim the login is healthy: the
+    // expiry is inside the credential nobody here can read. So it says what is
+    // established, which is that the figures are unavailable and why.
+    case 'unreadable-store':
+      return {
+        icon: 'circle-slash',
+        label: 'Claude: usage unavailable',
+        tooltip:
+          'Claude Code stores its credential where this extension cannot read it, so usage cannot be tracked on this machine.\n' +
+          'Signing in again will not change that — a renewed token goes to the same place.',
+        severity: 'none',
+      };
+
+    // Raised by the engine only while a redemption is actually in flight, so the
+    // bound is seconds. It is never a resting state: the poll that follows
+    // replaces it either way.
+    case 'renewing':
+      return {
+        icon: 'sync~spin',
+        label: 'Claude: renewing',
+        tooltip: 'The Claude Code access token expired. Renewing it now.',
+        severity: 'none',
+      };
+
+    // A redemption was refused within the last half hour, so this is the one
+    // expiry that is not merely a wait. It earns a colour for that reason and
+    // for one more: where renewal works, the state below is unreachable, so
+    // without this the only difference between "renewal is broken" and "nothing
+    // has happened yet" would be a line in a log nobody opens.
+    //
+    // Still not an error. The credential is untouched, the login is fine, and
+    // using Claude Code fixes it — the warning is about our renewal, not theirs.
+    case 'renewal-failed':
+      return {
+        icon: 'warning',
+        label: 'Claude: renewal failed',
+        tooltip:
+          'The Claude Code access token expired and could not be renewed.\n' +
+          'Your login is fine, and using Claude Code renews it.\n' +
+          'The reason is in the Claude Usage Graph output channel.',
+        severity: 'warning',
+      };
+
+    // An access token lasts eight hours, so this is what a machine looks like
+    // after a night off. Nothing is wrong and nobody needs to sign in, which is
+    // why it carries no severity.
+    //
+    // Reached when no renewal is coming: either one was tried and failed, or the
+    // credential is in a store this cannot write, which is macOS. So it must not
+    // promise a number of minutes — a machine left alone sits here until Claude
+    // Code is used, and naming a bound that never arrives is worse than naming
+    // none.
+    case 'stale-token':
+      return {
+        icon: 'sync',
+        label: 'Claude: token expired',
+        tooltip:
+          'The Claude Code access token has expired.\n' +
+          'Tracking resumes the next time you use Claude Code, which renews it.',
+        severity: 'none',
+      };
+
+    // The endpoint refused a credential that had *not* expired. Renewing cannot
+    // help, which is what separates this from the case above and why it keeps
+    // the error colour.
     case 'auth-error':
       return {
         icon: 'error',
-        label: 'Claude: session expired',
-        tooltip: `The Claude Code session token has expired. Run \`claude\` to sign in again.\n${RESUME_PHRASE}`,
+        label: 'Claude: rejected',
+        tooltip: status.message ?? 'Anthropic refused the Claude Code credential.',
         severity: 'error',
       };
 

@@ -17,3 +17,7 @@ docs/LOCAL.md
 # Regenerated per screenshot session (scripts/make-screenshot-fixture.mjs)
 fixtures/screenshot-usage.json
 .vscode-test-host/
+
+# Auth refresh investigation: probe script, logs and credential snapshots.
+# Snapshots hold live tokens; this must never be committed.
+.auth-probe/

@@ -33,12 +33,26 @@ export interface IEventBus<T> extends IDisposable {
 }
 
 /**
- * Reads Claude Code's credential store. There is intentionally no write, no
- * refresh, and no token of our own: the absence of those methods is the
- * guarantee, not a comment promising it.
+ * Reads Claude Code's credential store. Separate from the refresher below, and
+ * kept that way: the read path is on every poll and can never write, so no
+ * ordinary tick can disturb a login.
  */
 export interface ICredentialStore {
   read(): Promise<CredentialResult>;
+}
+
+/**
+ * Renews the access token in Claude Code's credential store.
+ *
+ * It is not free of consequence, and the consequence is the whole design. A
+ * renewal may rotate the refresh token, so a copy of the credential taken
+ * beforehand is dead the moment this returns, and an implementation that
+ * redeems a grant without durably storing what comes back signs the user out.
+ * Nothing here keeps such a copy, and nothing should.
+ */
+export interface ICredentialRefresher {
+  /** True when the credential on disk reads back renewed. Never throws. */
+  refresh(): Promise<boolean>;
 }
 
 /** Throws `PollError` on any failure; never returns a partial snapshot. */

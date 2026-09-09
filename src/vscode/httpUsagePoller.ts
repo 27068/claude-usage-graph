@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
+import { ClientVersion } from '../core/clientVersion';
 import type { IClock, ICredentialStore, ILogger, IUsagePoller } from '../core/interfaces';
 import { normalizeSnapshot } from '../core/normalize';
 import { PollError } from '../core/types';
@@ -10,7 +8,6 @@ import type { UsageSnapshot } from '../core/types';
 
 const USAGE_ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
 const OAUTH_BETA = 'oauth-2025-04-20';
-const FALLBACK_CLIENT_VERSION = '2.1.0';
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
@@ -21,19 +18,23 @@ const REQUEST_TIMEOUT_MS = 30_000;
  *
  *  - The `User-Agent` must identify as Claude Code. Without it the endpoint
  *    drops into an aggressively rate-limited bucket that returns 429 for tens of
- *    minutes with no `Retry-After` to guide a client back.
+ *    minutes with no `Retry-After` to guide a client back. `ClientVersion`
+ *    builds it, shared with the token request so the two cannot disagree.
  *  - A missing or expired credential is resolved *before* any request, so the
  *    common "not signed in" case costs nothing and can be retried on the normal
  *    cadence without hammering anyone.
  */
 export class HttpUsagePoller implements IUsagePoller {
-  private clientVersion: string | undefined;
+  private readonly clientVersion: ClientVersion;
 
   constructor(
     private readonly credentials: ICredentialStore,
     private readonly clock: IClock,
-    private readonly logger: ILogger,
-  ) {}
+    logger: ILogger,
+    clientVersion?: ClientVersion,
+  ) {
+    this.clientVersion = clientVersion ?? new ClientVersion(logger);
+  }
 
   async poll(): Promise<UsageSnapshot> {
     const credential = await this.credentials.read();
@@ -42,12 +43,24 @@ export class HttpUsagePoller implements IUsagePoller {
       case 'missing':
         throw new PollError('no-credentials', 'Claude Code credentials were not found');
       case 'malformed':
-        throw new PollError('no-credentials', `Credential store unreadable: ${credential.reason}`);
-      case 'expired':
+        // The store read and parsed; only its contents make no sense. Saying it
+        // was unreadable would send somebody looking at file permissions.
         throw new PollError(
-          'auth-error',
-          'The Claude Code session token has expired. Run `claude` to sign in again.',
+          'no-credentials',
+          `The Claude Code credential store is not in a shape this understands: ${credential.reason}`,
         );
+      case 'unreadable':
+        throw new PollError(
+          'unreadable-store',
+          'Claude Code keeps its credential in a store this extension cannot read',
+        );
+      case 'signed-out':
+        throw new PollError(
+          'no-credentials',
+          'The Claude Code login has expired. Run `claude` in a terminal and sign in.',
+        );
+      case 'stale':
+        throw new PollError('stale-token', 'The Claude Code access token needs renewing');
       default:
         break;
     }
@@ -86,7 +99,7 @@ export class HttpUsagePoller implements IUsagePoller {
         headers: {
           Authorization: `Bearer ${token}`,
           'anthropic-beta': OAUTH_BETA,
-          'User-Agent': `claude-code/${await this.resolveClientVersion()}`,
+          'User-Agent': await this.clientVersion.userAgent(),
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
@@ -99,28 +112,4 @@ export class HttpUsagePoller implements IUsagePoller {
     }
   }
 
-  /** Prefer the installed Claude Code version; fall back to a pinned constant. */
-  private async resolveClientVersion(): Promise<string> {
-    if (this.clientVersion !== undefined) {
-      return this.clientVersion;
-    }
-
-    try {
-      const raw = await fs.readFile(path.join(os.homedir(), '.claude.json'), 'utf8');
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      for (const key of ['version', 'lastReleaseNotesSeen', 'installedVersion']) {
-        const candidate = parsed[key];
-        if (typeof candidate === 'string' && /^\d+\.\d+/.test(candidate)) {
-          this.clientVersion = candidate;
-          return candidate;
-        }
-      }
-    } catch {
-      // Not fatal: the header only has to look like Claude Code, not match it.
-    }
-
-    this.logger.info(`Using fallback client version ${FALLBACK_CLIENT_VERSION}`);
-    this.clientVersion = FALLBACK_CLIENT_VERSION;
-    return this.clientVersion;
-  }
 }

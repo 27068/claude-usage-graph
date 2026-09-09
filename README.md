@@ -67,8 +67,8 @@ status bar so you can stop guessing how much is left.
 - **A Claude Pro or Max subscription.** These usage figures do not exist for
   API-key accounts.
 - **Claude Code installed and signed in on your local machine.** The extension
-  has no login of its own — it reads the session Claude Code already maintains,
-  and never writes to it.
+  has no login of its own — it uses the session Claude Code already maintains,
+  and the only thing it ever writes there is a renewal of that same session.
 
 If you are not signed in, the status bar says so, and tracking starts by itself
 within three minutes of your running `claude` and logging in. There is nothing
@@ -164,10 +164,10 @@ the dashboard.
 
 Between sessions the first figure reads `idle` rather than a stale percentage —
 there is no open window to be a percentage of, and your next message is what
-starts the next five hours. If you are not signed in, or Claude Code's session
-has expired, the item says which and changes colour, and the tooltip tells you
-what to do; tracking resumes by itself within three minutes of your signing back
-in. Turn the whole item off with
+starts the next five hours. If you are not signed in, the item says so and
+changes colour, and the tooltip tells you what to do; tracking resumes by itself
+within three minutes of your signing back in. An expired access token is
+refreshed for you. Turn the whole item off with
 `claudeUsageGraph.showStatusBar`.
 
 ---
@@ -188,24 +188,29 @@ extension.
 ### Coverage, honestly
 
 Tracking rides on the session token Claude Code maintains, which lasts about
-eight hours. The extension never refreshes it — renewal is entirely Claude
-Code's job, and we simply notice the new token on the next poll.
+eight hours. Claude Code renews it when you use it and at no other time, so on a
+machine left alone the token simply lapses. The extension therefore renews it
+the same way Claude Code does, using the refresh token already in your
+credential file, and keeps charting.
 
-The practical consequence: if you do not open Claude Code for a long stretch,
-the token lapses and the ledger has a hole. That gap is drawn as a real break in
-the line rather than smoothed over. It is a deliberate trade for never touching
-your credentials.
+On macOS that credential lives in the keychain rather than a file, so renewal
+stays Claude Code's job there and a long gap between sessions still leaves a
+hole in the ledger. Where that happens the gap is drawn as a real break in the
+line rather than smoothed over.
 
 ---
 
 ## Privacy 🛡️
 
-- **The extension stores no credentials of its own — anywhere.** It reads the
-  token Claude Code already holds and uses it for one read-only GET. There is no
-  refresh flow, no token in settings, nothing in SecretStorage, and no write path
-  to your credential store at all. That is enforced structurally rather than by
-  convention: the credential module has exactly one method, and a unit test fails
-  the build if a mutating one is ever added.
+- **The extension stores no credentials of its own — anywhere.** It uses the
+  token Claude Code already holds, for one read-only GET. There is no token in
+  settings and nothing in SecretStorage. It does renew that token when it
+  expires, redeeming the refresh token in your credential file exactly as Claude
+  Code does and writing the result back to the same file — the one thing it ever
+  writes there, and only when the token has already expired. A refusal leaves
+  the file untouched. The renewed credential is written to a temporary file and
+  moved into place, so an interrupted renewal cannot leave you with a damaged
+  one, and unit tests fail the build if that path is ever bypassed.
 - **Your data stays on your machine.** Time series are written to a private
   directory inside the extension's own storage. Nothing is proxied, uploaded, or
   sent to any telemetry endpoint.
@@ -284,8 +289,9 @@ The source is laid out around one rule:
 - `src/core/` — the persistent engine. Contains no `import * as vscode` at all,
   which is what lets the entire test suite run in a terminal.
 - `src/vscode/` — thin adapters implementing the interfaces `core` declares.
-- `src/auth/` — the read-only credential reader, kept vscode-free for the same
-  reason and guarded by tests that fail if a write or refresh path appears.
+- `src/auth/` — reading Claude Code's credential, and renewing it. Kept
+  vscode-free for the same reason, and guarded by tests that fail if the reader
+  gains a write path or the renewal stops going through a temporary file.
 
 ---
 

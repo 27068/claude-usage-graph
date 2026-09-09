@@ -120,10 +120,31 @@ describe('statusBarModel', () => {
     assert.strictEqual(model.severity, 'none');
   });
 
+  it('does not colour a stale token as a fault', () => {
+    // Eight hours without opening Claude Code is not an error, and the refresher
+    // clears it within a tick. Red here would fire only while nobody is using
+    // the thing being measured, and stand down the moment they are.
+    const stale = statusBarModel(inputs({ status: { state: 'stale-token' } }));
+
+    assert.strictEqual(stale.severity, 'none');
+    assert.ok(!/sign in/i.test(stale.tooltip), 'nobody needs to sign in for this');
+  });
+
+  it('tells a rejected credential apart from an expired one', () => {
+    // The actionable half of the two expiry states, and the one that must never
+    // reach the refresher.
+    const rejected = statusBarModel(
+      inputs({ status: { state: 'auth-error', message: 'Usage endpoint rejected the token (401)' } }),
+    );
+
+    assert.strictEqual(rejected.severity, 'error');
+    assert.ok(rejected.tooltip.includes('401'), rejected.tooltip);
+  });
+
   it('escalates a failed poll over whatever the numbers said', () => {
-    const expired = statusBarModel(inputs({ status: { state: 'auth-error' } }));
-    assert.strictEqual(expired.severity, 'error');
-    assert.ok(!expired.label.includes('42%'), 'a failure state replaces the readings');
+    const rejected = statusBarModel(inputs({ status: { state: 'auth-error' } }));
+    assert.strictEqual(rejected.severity, 'error');
+    assert.ok(!rejected.label.includes('42%'), 'a failure state replaces the readings');
 
     const missing = statusBarModel(inputs({ status: { state: 'no-credentials' } }));
     assert.strictEqual(missing.severity, 'warning');
@@ -138,14 +159,67 @@ describe('statusBarModel', () => {
   // people to reload therefore bought them nothing and implied that waiting
   // would not work. Both auth states must instead name the bound they resume
   // within, which is one poll interval.
-  it('tells both auth states how long a resume takes, and never to reload', () => {
-    for (const state of ['no-credentials', 'auth-error'] as const) {
-      const { tooltip } = statusBarModel(inputs({ status: { state } }));
+  // Only `no-credentials` is in this list. `auth-error` is the endpoint refusing
+  // a valid credential, which does not resolve on its own; `stale-token` clears
+  // faster than a poll interval, which the test below it covers instead.
+  it('tells the recoverable auth state how long a resume takes, and never to reload', () => {
+    const { tooltip } = statusBarModel(inputs({ status: { state: 'no-credentials' } }));
 
-      assert.ok(/resumes on its own within \d+ minutes/.test(tooltip), tooltip);
-      assert.ok(!/reload/i.test(tooltip) || /no reload needed/.test(tooltip), tooltip);
-    }
+    assert.ok(/resumes on its own within \d+ minutes/.test(tooltip), tooltip);
+    assert.ok(!/reload/i.test(tooltip) || /no reload needed/.test(tooltip), tooltip);
   });
+
+  it('offers no action for a credential store it cannot read', () => {
+    // Windows Credential Manager. Signing in and using Claude Code both write
+    // back to the same unreadable store, so either instruction would be a loop
+    // with no exit. It equally must not claim the login is healthy, since the
+    // expiry is in the credential nobody here can read.
+    const { tooltip, label, severity } = statusBarModel(
+      inputs({ status: { state: 'unreadable-store' } }),
+    );
+
+    assert.ok(!/not signed in/i.test(label), label);
+    assert.ok(!/run `?claude|sign in and|terminal/i.test(tooltip), tooltip);
+    assert.ok(!/within \d+ minutes/.test(tooltip), tooltip);
+    assert.strictEqual(severity, 'none', 'nothing is broken, so nothing is coloured');
+  });
+
+  it('says a renewal in flight is happening, and asks for nothing', () => {
+    // Raised only while a redemption is actually running, so it resolves in
+    // seconds and must not name a poll interval.
+    const { tooltip, label } = statusBarModel(inputs({ status: { state: 'renewing' } }));
+
+    assert.ok(/renewing/i.test(label), label);
+    assert.ok(!/within \d+ minutes/.test(tooltip), tooltip);
+    assert.ok(!/sign in|terminal/i.test(tooltip), tooltip);
+  });
+
+  it('colours a refused renewal, but does not call it an error', () => {
+    // Where renewal works this is the only way an expiry is ever seen, so it
+    // must not look like the quiet wait below. It is still not an error: the
+    // credential is untouched and the login is fine.
+    const { label, tooltip, severity } = statusBarModel(
+      inputs({ status: { state: 'renewal-failed' } }),
+    );
+
+    assert.strictEqual(severity, 'warning');
+    assert.ok(/renewal failed/i.test(label), label);
+    assert.ok(!/sign in/i.test(tooltip), 'nobody is signed out');
+    assert.ok(/output/i.test(tooltip), 'the reason lives in the log; say where');
+  });
+
+  it('does not promise a stale token resumes on a timer, because it may not', () => {
+    // Reached only when no renewal is coming — one failed, or the credential is
+    // in a store this cannot write, which is macOS. A machine left alone sits
+    // here until Claude Code is used, so naming minutes would send the reader to
+    // wait for a tick that was never going to clear it.
+    const { tooltip, label } = statusBarModel(inputs({ status: { state: 'stale-token' } }));
+
+    assert.ok(!/within \d+ minutes/.test(tooltip), tooltip);
+    assert.ok(!/renewing/i.test(label), label);
+    assert.ok(/use Claude Code/i.test(tooltip), tooltip);
+  });
+
 
   it('carries a poller message through on a network failure', () => {
     const model = statusBarModel(

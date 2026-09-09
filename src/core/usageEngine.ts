@@ -2,7 +2,14 @@
 
 import { Evictor } from './eviction';
 import { toFileName } from './fileNames';
-import type { IClock, IEventBus, ILedgerStorage, ILogger, IUsagePoller } from './interfaces';
+import type {
+  IClock,
+  ICredentialRefresher,
+  IEventBus,
+  ILedgerStorage,
+  ILogger,
+  IUsagePoller,
+} from './interfaces';
 import type { LedgerCache } from './ledgerCache';
 import { newModelCols, sessionValues, weekValues } from './normalize';
 import type { PollSchedule } from './pollSchedule';
@@ -74,6 +81,15 @@ const MIN_WAKE_MS = 5_000;
 const WAKE_JITTER_MS = 400;
 
 /**
+ * How long to leave renewal alone after an attempt failed.
+ *
+ * Long enough that a credential nobody can renew costs two token requests an
+ * hour rather than one every tick, short enough that coming back online is
+ * noticed without the user doing anything.
+ */
+const RENEWAL_COOLDOWN_MS = 30 * 60_000;
+
+/**
  * The persistent core. Runs from IDE start to shutdown, entirely independent of
  * whether a dashboard panel has ever been opened — it holds no reference to one,
  * and publishes to an event bus that may have no listeners at all.
@@ -84,6 +100,15 @@ export class UsageEngine {
   private stopped = false;
   private revision = 0;
   private consecutiveFailures = 0;
+  /**
+   * When renewal may be attempted again after one has failed.
+   *
+   * A cooldown rather than a latch, because the commonest reason a renewal fails
+   * is having no network, and that fixes itself. A latch lifted only by a
+   * successful poll could never lift at all: a stale credential fails before the
+   * request that would have cleared it.
+   */
+  private renewalBlockedUntil: Millis = 0;
   /** The shared deadline this window is currently waiting on. */
   private nextDueAt: Millis = 0;
   private lastSnapshot: UsageSnapshot | undefined;
@@ -102,6 +127,8 @@ export class UsageEngine {
     private readonly clock: IClock,
     private readonly logger: ILogger,
     private readonly options: UsageEngineOptions,
+    /** Absent means a stale token is simply reported and waited out. */
+    private readonly refresher?: ICredentialRefresher,
   ) {
     this.maxBackoffMs = options.maxBackoffMs ?? 30 * 60_000;
   }
@@ -238,13 +265,14 @@ export class UsageEngine {
     try {
       let snapshot: UsageSnapshot;
       try {
-        snapshot = await this.poller.poll();
+        snapshot = await this.pollWithRenewal();
       } catch (error) {
         this.handleFailure(error);
         return;
       }
 
       this.consecutiveFailures = 0;
+      this.renewalBlockedUntil = 0;
       this.lastSnapshot = snapshot;
       const outcome = await this.record(snapshot);
       this.emitStatus(this.options.mock === true ? 'mock' : 'ok');
@@ -255,6 +283,52 @@ export class UsageEngine {
       // no longer happening until the guard aged out.
       this.nextDueAt = this.clock.now() + this.currentDelay();
       await this.schedule.settle(this.nextDueAt, this.consecutiveFailures);
+    }
+  }
+
+  /**
+   * Poll; on a stale access token, renew it and poll again.
+   *
+   * Renewing inline rather than leaving it to the next tick, because it happens
+   * inside the poll claim this window already holds — deferring would idle every
+   * window for a whole interval to save one request. That claim is also what
+   * keeps several windows from redeeming the same grant at once.
+   *
+   * Only `stale-token` reaches the refresher. An `auth-error` is the endpoint
+   * refusing a credential that had *not* expired; renewing cannot fix that, and
+   * routing it here would spend a refresh token against a revoked login on every
+   * tick.
+   */
+  private async pollWithRenewal(): Promise<UsageSnapshot> {
+    try {
+      return await this.poller.poll();
+    } catch (error) {
+      if (
+        !(error instanceof PollError) ||
+        error.kind !== 'stale-token' ||
+        this.refresher === undefined ||
+        this.clock.now() < this.renewalBlockedUntil
+      ) {
+        throw error;
+      }
+
+      // Raised before the request, not after: redemption takes a moment, and a
+      // bar still showing the last reading through it looks stuck rather than
+      // busy. This is the only place `renewing` is emitted, which is what lets
+      // `stale-token` stay honest where no renewal is coming.
+      this.emitStatus('renewing', error.message);
+
+      if (!(await this.refresher.refresh())) {
+        this.renewalBlockedUntil = this.clock.now() + RENEWAL_COOLDOWN_MS;
+      }
+
+      // Poll again either way, and let the credential say what happened rather
+      // than guessing from the failure. A refusal our own refresher meets leaves
+      // the file untouched, so this stays `stale-token` — as it does when the
+      // request could not be made at all, which is the honest answer for
+      // somebody signed in and offline. It re-reads as `no-credentials` only
+      // when Claude Code has since cleared the tokens itself.
+      return await this.poller.poll();
     }
   }
 
@@ -330,16 +404,28 @@ export class UsageEngine {
     const kind = failure?.kind ?? 'network-error';
     const message = failure?.message ?? String(error);
 
-    // A missing or expired credential costs no network call, so retrying on the
-    // normal cadence is free and means we notice the moment Claude Code renews.
+    // A missing, stale or dead credential costs no network call, so retrying on
+    // the normal cadence is free and means we notice the moment Claude Code
+    // renews — whether that was our refresher or the user opening a terminal.
     const shouldBackOff = kind === 'rate-limited' || kind === 'network-error';
     if (shouldBackOff) {
       this.consecutiveFailures += 1;
     }
 
+    // A stale token *inside the renewal cooldown* is not the ordinary lapse: a
+    // redemption was attempted within the last half hour and refused. Where
+    // renewal works this state is otherwise unreachable, so the two need
+    // different colours — one is a wait, the other is broken. With no refresher
+    // wired in, macOS, the cooldown is never set and this stays the quiet one.
+    const renewalFailed = kind === 'stale-token' && this.clock.now() < this.renewalBlockedUntil;
+
     const retryAt = this.clock.now() + this.currentDelay();
     this.logger.warn(`Poll failed (${kind}): ${message}`);
-    this.emitStatus(kind, message, shouldBackOff ? retryAt : undefined);
+    this.emitStatus(
+      renewalFailed ? 'renewal-failed' : kind,
+      message,
+      shouldBackOff ? retryAt : undefined,
+    );
   }
 
   private currentDelay(): number {

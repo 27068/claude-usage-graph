@@ -6,6 +6,7 @@ import { FileLedgerStorage } from '../../core/ledgerStorage';
 import { LedgerCache } from '../../core/ledgerCache';
 import { PollSchedule } from '../../core/pollSchedule';
 import { UsageEngine } from '../../core/usageEngine';
+import type { ICredentialRefresher } from '../../core/interfaces';
 import { PollError } from '../../core/types';
 import type { LedgerUpdatedEvent, StatusEvent } from '../../core/types';
 import {
@@ -48,13 +49,41 @@ describe('UsageEngine', () => {
     await removeTempDir(root);
   });
 
-  function build(poller: StubPoller, owner = 'window-a', retentionMs?: number): UsageEngine {
+  function build(
+    poller: StubPoller,
+    owner = 'window-a',
+    retentionMs?: number,
+    refresher?: ICredentialRefresher,
+  ): UsageEngine {
     const schedule = new PollSchedule(root, owner, clock, logger, INTERVAL);
-    engine = new UsageEngine(poller, storage, cache, updates, statuses, schedule, clock, logger, {
-      intervalMs: INTERVAL,
-      ...(retentionMs === undefined ? {} : { retentionMs }),
-    });
+    engine = new UsageEngine(
+      poller,
+      storage,
+      cache,
+      updates,
+      statuses,
+      schedule,
+      clock,
+      logger,
+      {
+        intervalMs: INTERVAL,
+        ...(retentionMs === undefined ? {} : { retentionMs }),
+      },
+      refresher,
+    );
     return engine;
+  }
+
+  /** Counts calls, so a test can assert a refresh token was *not* spent. */
+  function stubRefresher(succeeds: boolean) {
+    const calls = { count: 0 };
+    const refresher: ICredentialRefresher = {
+      refresh: async () => {
+        calls.count += 1;
+        return succeeds;
+      },
+    };
+    return { refresher, calls };
   }
 
   /**
@@ -295,6 +324,100 @@ describe('UsageEngine', () => {
   it('reports ok after a successful poll', async () => {
     await build(new StubPoller(snapshotAt(NOW, { fiveReset: NOW + HOUR }))).start();
     assert.deepStrictEqual(statuses.received.at(-1), { state: 'ok' });
+  });
+
+  it('renews a stale token and polls again within the same tick', async () => {
+    const poller = new StubPoller().push(
+      new PollError('stale-token', 'needs renewing'),
+      snapshotAt(NOW, { five: 12, fiveReset: NOW + 2 * HOUR }),
+    );
+    const { refresher, calls } = stubRefresher(true);
+
+    await build(poller, 'window-a', undefined, refresher).start();
+
+    assert.strictEqual(calls.count, 1);
+    assert.strictEqual(poller.calls, 2, 'the second poll is the one that produces a reading');
+    assert.strictEqual(statuses.received.at(-1)?.state, 'ok');
+    assert.strictEqual((await storage.list('five_hour')).length, 1, 'the tick still records');
+  });
+
+  it('stops renewing once it has failed, rather than redeeming on every tick', async () => {
+    const poller = new StubPoller(new PollError('stale-token', 'needs renewing'));
+    const { refresher, calls } = stubRefresher(false);
+    const built = build(poller, 'window-a', undefined, refresher);
+
+    await built.start();
+    await nextTick(built);
+    await nextTick(built);
+
+    assert.strictEqual(calls.count, 1, 'one failure is enough to learn renewal is not working');
+  });
+
+  it('asks for a sign-in when a refused renewal cleared the credential', async () => {
+    // Claude Code empties the tokens when a renewal is refused, so the retry
+    // poll reads what happened off disk instead of the engine inferring it.
+    const poller = new StubPoller().push(
+      new PollError('stale-token', 'needs renewing'),
+      new PollError('no-credentials', 'Claude Code credentials were not found'),
+    );
+    const { refresher } = stubRefresher(false);
+
+    await build(poller, 'window-a', undefined, refresher).start();
+
+    assert.strictEqual(statuses.received.at(-1)?.state, 'no-credentials');
+  });
+
+  it('does not ask for a sign-in when the renewal simply could not run', async () => {
+    // Offline: the credential is left alone, so it still reads stale. Telling
+    // somebody who is signed in to sign in is worse than saying nothing.
+    const poller = new StubPoller(new PollError('stale-token', 'needs renewing'));
+    const { refresher } = stubRefresher(false);
+
+    await build(poller, 'window-a', undefined, refresher).start();
+
+    const state = statuses.received.at(-1)?.state;
+    assert.ok(state === 'renewal-failed', `expected renewal-failed, got ${String(state)}`);
+    assert.ok(
+      !statuses.received.some((event) => event.state === 'no-credentials'),
+      'nobody is signed out here',
+    );
+  });
+
+  it('separates a refused renewal from an expiry nothing was going to renew', async () => {
+    // Where renewal works, `stale-token` is unreachable except by failure, so
+    // the two must not share a colour. With no refresher — macOS — the cooldown
+    // is never set and the quiet state is the honest one.
+    const failing = build(
+      new StubPoller(new PollError('stale-token', 'needs renewing')),
+      'window-a',
+      undefined,
+      stubRefresher(false).refresher,
+    );
+    await failing.start();
+    assert.strictEqual(statuses.received.at(-1)?.state, 'renewal-failed');
+
+    failing.dispose();
+    statuses.received.length = 0;
+    // Past the shared deadline the first window just set, or the second defers
+    // to it and never polls at all.
+    clock.advance(INTERVAL);
+
+    // No refresher at all: nothing was attempted, so nothing failed.
+    await build(new StubPoller(new PollError('stale-token', 'needs renewing')), 'window-b').start();
+    assert.strictEqual(statuses.received.at(-1)?.state, 'stale-token');
+  });
+
+  it('never renews for a credential the endpoint rejected', async () => {
+    // The distinction the whole split exists for: renewing cannot fix a 401 on a
+    // token that had not expired, and trying would start a CLI on every tick
+    // against a revoked login.
+    const poller = new StubPoller(new PollError('auth-error', 'rejected the token (401)'));
+    const { refresher, calls } = stubRefresher(true);
+
+    await build(poller, 'window-a', undefined, refresher).start();
+
+    assert.strictEqual(calls.count, 0);
+    assert.strictEqual(statuses.received.at(-1)?.state, 'auth-error');
   });
 
   it('surfaces a credential failure without writing anything', async () => {

@@ -3,6 +3,7 @@
 import { randomUUID } from 'crypto';
 import * as vscode from 'vscode';
 import { CredentialReader } from './auth/credentialReader';
+import { CredentialRefresher } from './auth/credentialRefresher';
 import { ScenarioClock, SystemClock } from './core/clock';
 import { RETENTION_DAYS, retentionMsFromDays } from './core/eviction';
 import { LedgerCache } from './core/ledgerCache';
@@ -91,7 +92,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const mockPoller = useMock
     ? new MockUsagePoller(fixtureRoot, clock, logger, fixtureFile, fixtureBase)
     : undefined;
-  const poller = mockPoller ?? new HttpUsagePoller(new CredentialReader(clock, logger), clock, logger);
+  const credentials = new CredentialReader(clock, logger);
+  const poller = mockPoller ?? new HttpUsagePoller(credentials, clock, logger);
+  /**
+   * Renewal is an HTTP call this extension makes, and **never a spawned CLI**:
+   * the CLI does not await its own credential write before exiting, and this
+   * host's `PATH` is short of what would otherwise delay it long enough. See
+   * `docs/DECISIONS.md` section 2.
+   *
+   * Absent on macOS, where the credential is in the keychain and this can read
+   * it but not write it. The engine then reports an expired token and waits,
+   * rather than announcing a renewal that is not coming.
+   */
+  const refresher =
+    process.platform === 'darwin' ? undefined : new CredentialRefresher(clock, logger);
 
   if (useMock) {
     logger.info(`Running with synthetic fixture data (development mode, ${fixtureFile})`);
@@ -115,6 +129,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           .get<number>('retentionDays', RETENTION_DAYS),
       ),
     },
+    refresher,
   );
 
   // Track the most recent meta and status so a panel opened later hydrates with

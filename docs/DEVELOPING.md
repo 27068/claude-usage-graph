@@ -3,6 +3,9 @@
 How the extension is put together, where to find things, and how to build, run
 and test it.
 
+> *Why* it is put together this way, and what was rejected, is in
+> `docs/DECISIONS.md`. Read that one before proposing a different design.
+>
 > Anything specific to *your* machine — resolved toolchain paths, local storage
 > locations — belongs in `docs/LOCAL.md`, which is gitignored. See
 > [Local environment](#9-local-environment) at the bottom.
@@ -297,34 +300,9 @@ compile` first.
 
 ### Two things that look like the obvious fix and are not
 
-Both get proposed roughly once a year, so the measurements are here rather than
-in a commit message.
-
-**A persisted index** — one file at the storage root holding
-`{ name, startAt, resetAt }` per ledger file, so a page can be resolved without
-listing. It is *slower than not having one*. Resolving one day page out of 10,950
-session files: `list()` + bound + read the page is 5.68 ms; index + the same read
-is 8.75 ms, because the index has to be reconciled against `list()` to stay a
-hint rather than an authority, so its own read is pure addition. In practice the
-no-index figure is lower still, since `reload` calls `list()` every tick anyway.
-It also cannot desync, needs no writer coordination, and has no crash-recovery
-story — because it is not a record of the directory, it *is* the directory. See
-the bounds in `core/fileNames.ts`.
-
-**SQLite** — indexed range queries, eviction as one `DELETE`, real transactions,
-change detection from `PRAGMA data_version`, and no more `MutexRegistry` or
-`atomicWrite` retry ladder. Multi-process is a non-concern; SQLite is built for
-it. It is rejected on **distribution**, not on merits: `package.json` has zero
-runtime dependencies today, `engines.vscode` is `^1.90.0` which predates Node
-22.5 so `node:sqlite` cannot be assumed, `better-sqlite3` is native and must
-match the *Electron* ABI (per-platform vsix targets, re-cut whenever that moves),
-and `sql.js` serialises the whole database back to disk, which reintroduces the
-whole-file rewrite this design exists to avoid. Two trade-offs worth knowing
-either way: corruption gets much less likely but its blast radius inverts —
-`readUnlocked` quarantines one damaged file and carries on, and there is no
-equivalent for a corrupt `.db` — and SQLite's most-documented corruption cause is
-broken locking on network filesystems, which is exactly what a roaming or
-network-mounted config directory can be.
+A persisted index of the ledger directory, and SQLite in place of files. Both are
+rejected — the first on a measurement that goes the other way, the second on
+distribution rather than on merits. `DECISIONS.md` section 1 has the numbers.
 
 ---
 
@@ -353,6 +331,7 @@ network-mounted config directory can be.
 | `mutex.ts` | Promise-chain mutex serialising writes. |
 | `atomicWrite.ts` | Temp-file-plus-rename, with Windows contention retries. |
 | `clock.ts` | `SystemClock`, and `ScenarioClock` for the manual-testing rig (section 10). Injected so tests drive time deterministically. |
+| `clientVersion.ts` | The `claude-code/<version>` User-Agent both Anthropic requests carry. Shared so the usage and token calls cannot disagree about who is calling. |
 
 ### `src/vscode/` — adapters
 
@@ -378,7 +357,8 @@ network-mounted config directory can be.
 | Path | What it is |
 | --- | --- |
 | `src/extension.ts` | Composition root. The whole dependency graph, assembled once. |
-| `src/auth/credentialReader.ts` | Reads Claude Code's token. One public method, no write path, no refresh — by design, and asserted in tests. |
+| `src/auth/credentialReader.ts` | Reads Claude Code's token. One public method, no write path and no network — by design, and asserted in tests. |
+| `src/auth/credentialRefresher.ts` | Redeems the refresh token and writes the new pair back. The one file that can cost a login; read the section on it before changing anything between the request and the flush. |
 | `src/test/suite/` | The unit suite. One file per core concern, plus `architecture.test.ts`. |
 | `media/dashboard.js` | **Build artifact.** esbuild bundle of `webview/client/`. Generated, gitignored. Never edit. |
 | `media/dashboard.css` | Dashboard styling. Hand-written, not generated. |
@@ -388,6 +368,7 @@ network-mounted config directory can be.
 | `scripts/make-screenshot-fixture.mjs` | Writes the above, anchored to the clock at generation time. |
 | `scripts/bench-ledger-*.mjs` | Ledger read benchmarks — reload cost and single-page cost. See section 2. |
 | `scripts/make-icon.mjs` | Draws the icon from signed distance fields — see section 11. |
+| `scripts/probe-token-endpoint.mjs` | Asks the OAuth token endpoint whether it accepts our request shape, with an invalid token so nothing is spent. The one check the stubbed suite cannot make — `DECISIONS.md` section 2. |
 
 ### Where do I find...?
 
@@ -400,6 +381,7 @@ network-mounted config directory can be.
 - **Two windows fighting, or a corrupt write** — `core/pollSchedule.ts`,
   `core/atomicWrite.ts`.
 - **Auth, or "not signed in"** — `auth/credentialReader.ts`, `vscode/statusBar.ts`.
+- **A token that expired and did not come back** — `auth/credentialRefresher.ts`.
 - **Adding a command or setting** — `package.json` `contributes`, then
   `extension.ts` to wire it.
 
@@ -593,10 +575,10 @@ npm run test:unit    # tsc -p ./ && mocha
 
 Plain mocha — no VS Code, no network, no display. That works because of the rule
 in section 2, and `architecture.test.ts` exists to keep it working. That file
-also asserts the auth layer has no write or refresh path, that
-`dashboardPanel.ts` subscribes before assigning HTML (losing the `ready` message
-leaves the panel blank — this shipped once), and that every write goes through
-`atomicWrite`.
+also asserts what guards the credential store, for the reasons in
+`DECISIONS.md` section 2; that `dashboardPanel.ts` subscribes before assigning
+HTML (losing the `ready` message leaves the panel blank — this shipped once); and
+that every ledger write goes through `atomicWrite`.
 
 Note `test:unit` runs `tsc -p ./` only, so it does **not** rebuild the webview
 bundle. Tests passing tells you nothing about whether the chart on screen is

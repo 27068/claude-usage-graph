@@ -535,8 +535,14 @@ function showStatus(message: HostMessage & { type: 'status' }): void {
   const friendly: Record<string, string> = {
     ok: '',
     mock: 'Showing synthetic development data.',
-    'no-credentials': 'Claude Code credentials not found. Run `claude` in a terminal and sign in, then reload.',
-    'auth-error': 'Your Claude Code session has expired. Run `claude` to sign in again.',
+    'no-credentials': 'Claude Code credentials not found. Run `claude` in a terminal and sign in.',
+    'unreadable-store':
+      'Claude Code stores its credential where this extension cannot read it, so usage cannot be tracked on this machine.',
+    renewing: 'Renewing the Claude Code access token.',
+    'renewal-failed':
+      'The Claude Code access token could not be renewed. Your login is fine; using Claude Code renews it.',
+    'stale-token': 'The Claude Code access token has expired; it renews the next time you use Claude Code.',
+    'auth-error': 'Anthropic refused the Claude Code credential.',
     'rate-limited': 'Anthropic is rate limiting requests; backing off.',
     'network-error': 'Could not reach Anthropic.',
   };

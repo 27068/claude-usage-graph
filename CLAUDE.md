@@ -1,9 +1,10 @@
 # Claude Usage Graph — agent notes
 
-Read this before running commands or editing. It is short on purpose; the full
-detail lives in `docs/DEVELOPING.md`, which you should open when you need the
-architecture tour (section 2), the file map (section 3), or the chart internals
-(section 7).
+Read this before running commands or editing. It is short on purpose. Open
+`docs/DEVELOPING.md` for the architecture tour (section 2), the file map
+(section 3) or the chart internals (section 7), and `docs/DECISIONS.md` before
+proposing a different design — it holds the alternatives already rejected and
+what decided them.
 
 Nothing in this file is specific to one machine. Those details live in
 `docs/LOCAL.md`, which is gitignored and imported here — read the imported
@@ -103,7 +104,7 @@ this, and that is the point:
    surprise in how the tooling behaves.
 2. It is not recoverable from the code, `package.json` or `git log` in a minute.
 3. It will still be true next month, and true for someone other than you.
-4. It is not already written down somewhere in these three files.
+4. It is not already written down somewhere in these four files.
 
 How a function works, what a change did, why a bug happened: all out. That is
 what the code and its comments are for.
@@ -116,6 +117,10 @@ first*, audience second:
   a local fact is a local fact whether a person or an agent needs it. This is the
   test that catches most mistakes: "node is not on PATH" reads like a rule but is
   a claim about one machine, so it belongs here, not in a committed file.
+- Otherwise, is it *why* rather than *how* — an alternative someone would
+  re-propose, and what rules it out? Then `docs/DECISIONS.md`. A decision earns a
+  place there only if the code cannot state it, which usually means it is about
+  something the code deliberately does not do.
 - Otherwise, if it explains the project — `docs/DEVELOPING.md`.
 - Otherwise, if it changes how an agent behaves — this file.
 
@@ -136,7 +141,8 @@ Removing a stale line needs no permission; just say you removed it.
 
 **Style.** State the fact and its consequence in one or two sentences. No dates,
 no changelog entries, no "as of", no attribution, no notes about what used to be
-true.
+true. Never invent a frequency or a quantity to make a point land — "gets
+proposed about once a year", in a repo weeks old, is the shape of it.
 
 ## Tooling notes
 

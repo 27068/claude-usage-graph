@@ -10,17 +10,48 @@ import type { CredentialResult, Millis } from '../core/types';
 /**
  * Reads the OAuth access token Claude Code already maintains.
  *
- * This class deliberately has exactly one public method. There is no refresh, no
- * write, and no token of our own: the *absence* of those code paths is the
- * guarantee that a bug here can never corrupt someone's Claude Code login, and
- * the reason no refresh-token rotation race is possible.
+ * One public method, no write path and no network call. Renewal lives next door
+ * in `credentialRefresher.ts`, and the separation is the point: every poll comes
+ * through here and only an expired credential goes there, so nothing on the
+ * common path can disturb a login however it fails.
  *
- * Renewal is entirely Claude Code's job. We re-read on every poll, so whenever
- * it refreshes we pick the new token up on the next tick for free.
+ * Re-read on every poll rather than cached, so a token renewed by anyone — this
+ * extension, a terminal, another window — is picked up on the next tick.
  */
 
-/** Treat a token as expired slightly early so it cannot die mid-request. */
-export const EXPIRY_SKEW_MS = 60_000;
+/**
+ * Claude Code's own pre-emptive refresh band, read from the shipped binary.
+ *
+ * Its token provider renews in the background once a token has under two
+ * minutes left, and synchronously under thirty seconds — but only when
+ * something asks it for a token, never on a timer. So this is the window in
+ * which an active Claude Code may rotate the credential out from under a
+ * redemption we have already started.
+ */
+export const CLAUDE_CODE_REFRESH_BAND_MS = 120_000;
+
+/**
+ * How early a token is treated as expired.
+ *
+ * Two constraints set this, and neither is the request timeout — the request is
+ * never the binding constraint:
+ *
+ *  - **Longer than one poll.** The interval decides when we next get to act at
+ *    all, so a shorter skew is simply stepped over: a poll lands while the token
+ *    still reads fresh, and the next chance to notice arrives after it has
+ *    genuinely expired.
+ *  - **Finished before Claude Code's band opens.** The latest we can renew is
+ *    one interval after the window opens, so that moment must still fall before
+ *    `CLAUDE_CODE_REFRESH_BAND_MS`. Otherwise both of us can redeem the same
+ *    refresh token at once, and a server that treats reuse as theft revokes the
+ *    family and signs the user out.
+ *
+ * So: one poll interval, plus Claude Code's band, plus a minute of slack. Six
+ * minutes, worst case renewing three minutes before expiry and a minute before
+ * the band. It costs 1.25% of an eight-hour token. `credentials.test.ts` asserts
+ * the arithmetic rather than trusting this comment to survive a constant moving.
+ */
+export const EXPIRY_SKEW_MS = 360_000;
 
 const KEYCHAIN_SERVICE = 'Claude Code-credentials';
 
@@ -59,14 +90,45 @@ export class CredentialReader implements ICredentialStore {
       if (code !== undefined && code !== 'ENOENT') {
         this.logger.warn(`Could not read Claude Code credentials: ${String(error)}`);
       }
-      return { state: 'missing' };
+      return (await this.accountConfigured()) ? { state: 'unreadable' } : { state: 'missing' };
     }
 
     return this.parse(raw);
   }
 
+  /**
+   * Whether Claude Code has an account signed in, asked without the credential.
+   *
+   * `~/.claude.json` records the account — an address, a user id, an org — and no
+   * token at all, so it survives wherever the credential itself went. It is the
+   * only local evidence separating "nobody is signed in" from "signed in, stored
+   * somewhere unreadable", and those two need opposite messages.
+   *
+   * It cannot say whether that login is still current: the expiry is inside the
+   * credential nobody here can read. The message is worded to claim only what
+   * this establishes.
+   *
+   * Read only when the credential is already absent, so the common path still
+   * touches one file. Any failure answers no, which asks for a sign-in that is
+   * at worst redundant — a wrong yes would leave somebody with no action at all.
+   */
+  private async accountConfigured(): Promise<boolean> {
+    try {
+      const parsed = JSON.parse(await this.readFile(this.configPath())) as {
+        oauthAccount?: unknown;
+      };
+      return typeof parsed.oauthAccount === 'object' && parsed.oauthAccount !== null;
+    } catch {
+      return false;
+    }
+  }
+
   private credentialsPath(): string {
     return path.join(this.homeDir, '.claude', '.credentials.json');
+  }
+
+  private configPath(): string {
+    return path.join(this.homeDir, '.claude.json');
   }
 
   private parse(raw: string): CredentialResult {
@@ -84,21 +146,68 @@ export class CredentialReader implements ICredentialStore {
       return { state: 'malformed', reason: 'no claudeAiOauth section' };
     }
 
-    const { accessToken, expiresAt } = oauth as { accessToken?: unknown; expiresAt?: unknown };
-    if (typeof accessToken !== 'string' || accessToken.length === 0) {
-      return { state: 'malformed', reason: 'no access token' };
+    const { accessToken, refreshToken, expiresAt, refreshTokenExpiresAt } = oauth as {
+      accessToken?: unknown;
+      refreshToken?: unknown;
+      expiresAt?: unknown;
+      refreshTokenExpiresAt?: unknown;
+    };
+
+    const expiry =
+      typeof expiresAt === 'number' && Number.isFinite(expiresAt)
+        ? normalizeExpiry(expiresAt)
+        : undefined;
+
+    const access = typeof accessToken === 'string' ? accessToken : '';
+    const hasAccess = access.length > 0;
+    const hasRefresh = typeof refreshToken === 'string' && refreshToken.length > 0;
+
+    // Claude Code empties this section rather than deleting it when it refuses a
+    // renewal: blank tokens and a zeroed expiry, every key still in place. With
+    // neither token there is nothing left to renew from, whatever the expiries
+    // claim, so this is a login signed out and not a store that cannot be read.
+    // The difference is the whole message — one sends somebody to `claude`, the
+    // other after a corruption that is not there.
+    if (!hasAccess && !hasRefresh) {
+      return { state: 'signed-out', expiresAt: expiry ?? 0 };
     }
-    if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
+
+    // A blank access token beside a refresh token that is still there is Claude
+    // Code between tokens, which is the same wait as an expired one.
+    if (!hasAccess) {
+      return {
+        state: renewable(refreshTokenExpiresAt, this.clock.now()) ? 'stale' : 'signed-out',
+        expiresAt: expiry ?? 0,
+      };
+    }
+
+    if (expiry === undefined) {
       return { state: 'malformed', reason: 'no expiry' };
     }
 
-    const expiry = normalizeExpiry(expiresAt);
     if (expiry - EXPIRY_SKEW_MS <= this.clock.now()) {
-      return { state: 'expired', expiresAt: expiry };
+      return {
+        state: renewable(refreshTokenExpiresAt, this.clock.now()) ? 'stale' : 'signed-out',
+        expiresAt: expiry,
+      };
     }
 
-    return { state: 'ok', token: accessToken, expiresAt: expiry };
+    return { state: 'ok', token: access, expiresAt: expiry };
   }
+}
+
+/**
+ * Whether Claude Code can still renew a credential it holds a refresh token for.
+ *
+ * An absent refresh expiry counts as renewable. Getting this wrong in that
+ * direction costs one CLI start; the other direction puts a sign-in prompt in
+ * front of somebody who is already signed in.
+ */
+function renewable(refreshTokenExpiresAt: unknown, now: Millis): boolean {
+  if (typeof refreshTokenExpiresAt !== 'number' || !Number.isFinite(refreshTokenExpiresAt)) {
+    return true;
+  }
+  return normalizeExpiry(refreshTokenExpiresAt) > now;
 }
 
 /**

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import * as assert from 'assert';
-import { CredentialReader, EXPIRY_SKEW_MS } from '../../auth/credentialReader';
+import {
+  CLAUDE_CODE_REFRESH_BAND_MS,
+  CredentialReader,
+  EXPIRY_SKEW_MS,
+} from '../../auth/credentialReader';
+import { POLL_INTERVAL_MS } from '../../core/usageEngine';
 import { FakeClock, RecordingLogger } from './helpers';
 
 const NOW = 1_770_400_800_000;
@@ -19,6 +24,12 @@ function validPayload(expiresAt: number) {
       expiresAt,
       scopes: ['user:inference'],
     },
+  };
+}
+
+function withRefreshExpiry(expiresAt: number, refreshTokenExpiresAt: number) {
+  return {
+    claudeAiOauth: { ...validPayload(expiresAt).claudeAiOauth, refreshTokenExpiresAt },
   };
 }
 
@@ -57,6 +68,53 @@ describe('CredentialReader', () => {
     assert.strictEqual(result.state === 'ok' && result.token, 'sk-ant-oat01-example');
   });
 
+  // Claude Code keeps one credential store and picks it by platform, so a
+  // successful write to Windows Credential Manager deletes the file. The account
+  // in `~/.claude.json` is the only local thing left that separates that from a
+  // real sign-out, and the two need opposite messages: one has an action, the
+  // other has none.
+  describe('when the credential file is absent', () => {
+    function readerWithConfig(config: string | Error) {
+      const logger = new RecordingLogger();
+      const reader = new CredentialReader(new FakeClock(NOW), logger, {
+        platform: 'win32',
+        homeDir: '/home/test',
+        readFile: async (target: string) => {
+          if (target.endsWith('.claude.json')) {
+            if (config instanceof Error) {
+              throw config;
+            }
+            return config;
+          }
+          throw missingError();
+        },
+      });
+      return { reader, logger };
+    }
+
+    it('reads a configured account as signed in somewhere unreadable', async () => {
+      const { reader } = readerWithConfig(
+        JSON.stringify({ oauthAccount: { emailAddress: 'someone@example.com' } }),
+      );
+
+      assert.deepStrictEqual(await reader.read(), { state: 'unreadable' });
+    });
+
+    it('reads no account as genuinely signed out', async () => {
+      const { reader } = readerWithConfig(JSON.stringify({ hasCompletedOnboarding: true }));
+
+      assert.deepStrictEqual(await reader.read(), { state: 'missing' });
+    });
+
+    it('asks for a sign-in when the config cannot be read either', async () => {
+      // An instruction that may be redundant beats none: claiming the credential
+      // is unreadable would leave somebody with nothing at all to try.
+      const { reader } = readerWithConfig(missingError());
+
+      assert.deepStrictEqual(await reader.read(), { state: 'missing' });
+    });
+  });
+
   it('reports a missing credential store rather than throwing', async () => {
     const { reader, logger } = readerFor(missingError());
 
@@ -68,12 +126,46 @@ describe('CredentialReader', () => {
     const { reader } = readerFor(store(validPayload(NOW - HOUR)));
     const result = await reader.read();
 
-    assert.strictEqual(result.state, 'expired');
+    assert.strictEqual(result.state, 'stale');
+  });
+
+  it('separates a renewable token from a login that is actually over', async () => {
+    // The same expired access token twice. Only the refresh expiry differs, and
+    // it is the whole difference between "wait" and "go and sign in".
+    const live = readerFor(store(withRefreshExpiry(NOW - HOUR, NOW + 20 * 24 * HOUR)));
+    assert.strictEqual((await live.reader.read()).state, 'stale');
+
+    const dead = readerFor(store(withRefreshExpiry(NOW - HOUR, NOW - HOUR)));
+    assert.strictEqual((await dead.reader.read()).state, 'signed-out');
+  });
+
+  it('treats an absent refresh expiry as renewable', async () => {
+    // Claude Code has not always written the field. Guessing "signed out" here
+    // would put a sign-in prompt in front of someone who is signed in; guessing
+    // the other way costs one CLI start that finds nothing to do.
+    const { reader } = readerFor(store(validPayload(NOW - HOUR)));
+    assert.strictEqual((await reader.read()).state, 'stale');
+  });
+
+  it('renews early enough to finish before Claude Code would start', () => {
+    // The latest we can act is one interval after the window opens, and that
+    // must land before Claude Code's own pre-emptive band — otherwise both of us
+    // redeem the same refresh token, and a server that treats reuse as theft
+    // signs the user out. Moving the interval or the band without moving the
+    // skew reintroduces that silently, which is the only reason this is asserted
+    // rather than left to the comment beside the constant.
+    const latestRenewal = EXPIRY_SKEW_MS - POLL_INTERVAL_MS;
+
+    assert.ok(
+      latestRenewal > CLAUDE_CODE_REFRESH_BAND_MS,
+      `worst-case renewal is ${latestRenewal}ms before expiry, inside Claude Code's ` +
+        `${CLAUDE_CODE_REFRESH_BAND_MS}ms band`,
+    );
   });
 
   it('treats a token inside the skew window as already expired', async () => {
     const { reader } = readerFor(store(validPayload(NOW + EXPIRY_SKEW_MS - 1)));
-    assert.strictEqual((await reader.read()).state, 'expired');
+    assert.strictEqual((await reader.read()).state, 'stale');
   });
 
   it('accepts a token just outside the skew window', async () => {
@@ -92,7 +184,7 @@ describe('CredentialReader', () => {
       readFile: async () => contents,
     });
 
-    assert.strictEqual((await reader.read()).state, 'expired');
+    assert.strictEqual((await reader.read()).state, 'stale');
 
     // Claude Code refreshes; we notice on the very next read with no action of
     // our own. This is the entire renewal mechanism.
@@ -122,14 +214,58 @@ describe('CredentialReader', () => {
     for (const [contents, label] of [
       ['not json at all', 'invalid JSON'],
       [store({}), 'no oauth section'],
-      [store({ claudeAiOauth: {} }), 'no token'],
       [store({ claudeAiOauth: { accessToken: 'x' } }), 'no expiry'],
-      [store({ claudeAiOauth: { accessToken: '', expiresAt: NOW + HOUR } }), 'empty token'],
     ] as const) {
       const { reader } = readerFor(contents);
       const result = await reader.read();
       assert.strictEqual(result.state, 'malformed', `${label} should be malformed`);
     }
+  });
+
+  // What a refusal Claude Code will not renew actually leaves on disk: the keys
+  // are all still there, emptied. Reading that as damage rather than as a signed
+  // out login tells somebody their store is broken when all they need is
+  // `claude`, and it stays wrong until they sign in for unrelated reasons.
+  it('reads a store Claude Code cleared as signed out, not as damage', async () => {
+    for (const [contents, label] of [
+      [
+        store({
+          claudeAiOauth: {
+            accessToken: '',
+            refreshToken: '',
+            expiresAt: 0,
+            refreshTokenExpiresAt: 0,
+            scopes: [],
+          },
+        }),
+        'cleared by a refused renewal',
+      ],
+      [store({ claudeAiOauth: {} }), 'emptied section'],
+      [
+        store({ claudeAiOauth: { accessToken: '', refreshToken: '', expiresAt: NOW + HOUR } }),
+        'tokens blanked, expiry left alone',
+      ],
+    ] as const) {
+      const { reader } = readerFor(contents);
+      assert.strictEqual((await reader.read()).state, 'signed-out', `${label} should be signed out`);
+    }
+  });
+
+  // The other half of the same read: a blank access token beside a refresh token
+  // that is still good is Claude Code mid-renewal, and waiting is the answer.
+  it('waits on a blank access token while the refresh token still lives', async () => {
+    const { reader } = readerFor(
+      store({
+        claudeAiOauth: {
+          accessToken: '',
+          refreshToken: 'sk-ant-ort01-example',
+          expiresAt: 0,
+          refreshTokenExpiresAt: NOW + 28 * 24 * HOUR,
+        },
+      }),
+    );
+
+    assert.strictEqual((await reader.read()).state, 'stale');
   });
 
   it('warns on an unreadable store but still degrades cleanly', async () => {
@@ -148,7 +284,7 @@ describe('CredentialReader', () => {
     assert.deepStrictEqual(forbidden, [], `unexpected mutating methods: ${forbidden.join(', ')}`);
     assert.deepStrictEqual(
       surface.filter((name) => name !== 'constructor' && !name.startsWith('_')).sort(),
-      ['credentialsPath', 'parse', 'read'],
+      ['accountConfigured', 'configPath', 'credentialsPath', 'parse', 'read'],
       'the public surface should stay minimal',
     );
   });
