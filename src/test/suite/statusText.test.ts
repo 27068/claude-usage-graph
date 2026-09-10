@@ -84,16 +84,10 @@ describe('statusBarModel', () => {
     const model = statusBarModel(inputs({ seven: 79, sevenResetAt: null }));
 
     assert.ok(!model.label.includes('79%'), `an ended week must not report a value: ${model.label}`);
+    // A week always runs, so its expiry is a missing reading and never `idle` —
+    // and never zero, which we have not observed and cannot derive. The exact
+    // label below is what rules both out.
     assert.strictEqual(model.label, '42% 2h 0m · —');
-  });
-
-  // A week always runs, so its expiry is a missing reading and never `idle` —
-  // and never zero, which we have not observed and cannot derive.
-  it('never calls an ended week idle, and never invents a zero for it', () => {
-    const model = statusBarModel(inputs({ seven: 79, sevenResetAt: null }));
-
-    assert.ok(!model.label.includes('idle'), model.label);
-    assert.ok(!model.label.includes('0%'), model.label);
     assert.ok(!model.tooltip.includes('Weekly Usage: 79%'), 'the stale figure must not survive here either');
     assert.ok(model.tooltip.includes('no reading yet'), model.tooltip);
   });
@@ -155,10 +149,10 @@ describe('statusBarModel', () => {
   });
 
   // Reloading the window does not force a poll — it restarts the extension host
-  // and the first tick happens on the same cadence it would have anyway. Telling
-  // people to reload therefore bought them nothing and implied that waiting
-  // would not work. Both auth states must instead name the bound they resume
-  // within, which is one poll interval.
+  // and the first tick happens on the same cadence it would have anyway. So
+  // asking for a reload buys the reader nothing and implies that waiting will
+  // not work. A recoverable auth state must name the bound it resumes within
+  // instead, which is one poll interval.
   // Only `no-credentials` is in this list. `auth-error` is the endpoint refusing
   // a valid credential, which does not resolve on its own; `stale-token` clears
   // faster than a poll interval, which the test below it covers instead.
@@ -219,7 +213,6 @@ describe('statusBarModel', () => {
     assert.ok(!/renewing/i.test(label), label);
     assert.ok(/use Claude Code/i.test(tooltip), tooltip);
   });
-
 
   it('carries a poller message through on a network failure', () => {
     const model = statusBarModel(

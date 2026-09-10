@@ -279,8 +279,8 @@ export class UsageEngine {
       this.publish(outcome);
     } finally {
       // Unconditional, including when recording threw: an unsettled claim leaves
-      // `pollingSince` set, and every other window would defer to a poll that is
-      // no longer happening until the guard aged out.
+      // `pollingSince` set, and every other window defers to a poll that is not
+      // happening until the guard ages out.
       this.nextDueAt = this.clock.now() + this.currentDelay();
       await this.schedule.settle(this.nextDueAt, this.consecutiveFailures);
     }

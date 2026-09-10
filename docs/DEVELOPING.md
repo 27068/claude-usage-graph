@@ -584,6 +584,29 @@ Note `test:unit` runs `tsc -p ./` only, so it does **not** rebuild the webview
 bundle. Tests passing tells you nothing about whether the chart on screen is
 current.
 
+### What earns a test
+
+A test earns its place only if it can fail while every other test passes. The
+suite grows monotonically otherwise, because the pressure is all one way: a bug
+argues for a new case, and nothing ever argues for removing one.
+
+Two shapes account for almost all of the surplus, and both look like diligence:
+
+- **The same fixture asserted more weakly.** A test that feeds the inputs an
+  existing test already feeds, and checks less than that test's
+  `deepStrictEqual` already pins, cannot fail alone. It is a second name for one
+  case.
+- **A second example of one code path.** Weekly and five-hourly boundaries go
+  through one `readWindow`; a corrupt file is quarantined by the same branch
+  whatever its age. Re-running a branch with different numbers tests the numbers.
+
+So the deletion rule is *implication*, not similarity: cut a test only when a
+surviving one already constrains everything it asserted. Fold across before
+deleting — a comment that names the failure, or an assertion on a surface the
+survivor does not touch, is the part that was load-bearing. Tests for code that
+no longer exists are not the problem here and never will be: `tsc -p ./` runs
+first, so a test naming a deleted export fails to compile.
+
 ---
 
 ## 9. Local environment

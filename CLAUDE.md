@@ -86,6 +86,9 @@ branch that is safe to rewrite, and every commit on `main` is one that is not.
   absolute URLs from it, and hard-fails on both without it. Removing that field
   breaks packaging, and `--allow-missing-repository` does not cover images.
 - `docs/` and `src/` are excluded from the vsix via `.vscodeignore`.
+- A test earns its place only if it can fail while every other test passes. The
+  same fixture asserted more weakly, or a second example of one code path, only
+  renames a case the suite has — `docs/DEVELOPING.md` section 8 for cutting one.
 - Comments explain *why*, in the present tense, and never restate the code. **A
   comment is not a changelog**: no "used to", no "no longer", no what-was-tried,
   no gains a past change won — state the constraint that holds today. A rejected
@@ -131,7 +134,7 @@ detail to act on, state the portable half here and let the import supply the res
 keep it tight — but the line count is a prompt to compress, never a reason to
 drop something worth knowing. Rewrite a line rather than adding one beside it,
 and move mechanism to `docs/DEVELOPING.md` behind a pointer. Once what remains
-all earns its place, raise the target instead of cutting to meet it. ~150 today.
+all earns its place, raise the target instead of cutting to meet it. ~160 today.
 
 **Evict in the same pass.** Before relying on anything written here, check it is
 still true — the file, flag or script still exists. If it is wrong, correct or

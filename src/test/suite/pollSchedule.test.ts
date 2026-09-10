@@ -119,6 +119,9 @@ describe('PollSchedule', () => {
     );
   });
 
+  // And it costs exactly one turn: the deadline the dead window wrote on the way
+  // in is what everyone else is already waiting on, so there is no staleness
+  // timeout and no liveness probe to get wrong.
   it('takes over from a window that died mid-poll once the guard expires', async () => {
     const a = windowNamed('window-a');
     const b = windowNamed('window-b');
@@ -134,19 +137,6 @@ describe('PollSchedule', () => {
     // stop counting a live request as in flight, which is the one way two hosts
     // could end up writing one session file.
     assert.ok(POLL_GUARD_MS > 30_000, `guard is ${POLL_GUARD_MS}ms`);
-  });
-
-  // No staleness timeout and no liveness probe: a window that dies holding a
-  // turn costs one sample, because the deadline it wrote on the way in is what
-  // everyone else is waiting on.
-  it('loses only one turn when the polling window never comes back', async () => {
-    const dead = windowNamed('crashed');
-    const live = windowNamed('survivor');
-
-    await dead.claim();
-    clock.advance(INTERVAL + POLL_GUARD_MS);
-
-    assert.strictEqual((await live.claim()).granted, true, 'the next deadline is honoured as normal');
   });
 
   it('shares the failure count so a backoff outlives the window that started it', async () => {

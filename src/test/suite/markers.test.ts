@@ -74,13 +74,14 @@ describe('markersInFrame', () => {
 /**
  * The claim the selectors owe the chart.
  *
- * Everything below composes the real selector with the real filter, because that
- * is the join that was broken and neither half showed it: the selector returned
- * a perfectly sensible frame, the filter correctly dropped a marker outside it,
- * and the result was a live chart with no Now line and nothing to say why.
+ * Everything below composes the real selector with the real filter, because the
+ * join is where a defect hides with neither half looking wrong: a selector can
+ * return a perfectly sensible frame, the filter can correctly drop a marker
+ * outside it, and the result is a live chart with no Now line and nothing to say
+ * why.
  *
  * These do not prove Chart.js paints anything. They prove the marker survives as
- * far as the paint call, which is where the defect was.
+ * far as the paint call.
  */
 describe('Now survives the frame the selectors build', () => {
   describe('graph 1', () => {
@@ -149,18 +150,12 @@ describe('Now survives the frame the selectors build', () => {
       assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
     });
 
-    // Before the roll-forward the frame stayed anchored on the newest file, so a
-    // fortnight away put Now well past the right buffer and the marker vanished.
-    it('three cycles past the newest file on record', () => {
-      const now = at(21 + 17, 12);
-      const view = selectCalendarWeek(weeks, now, 0);
-
-      assert.ok(frameContains(view.domain, now));
-      assert.strictEqual(markersInFrame([marker(now)], view.domain).length, 1);
-    });
-
-    // Whatever walls a page reports must be drawable on it. The count varies now
-    // that walls are read off the ledger — what must not vary is that none is
+    // Offset 0 here is three cycles past the newest file on record, which is what
+    // the roll-forward is for: a frame anchored on the newest file instead would
+    // put Now past the right buffer and lose the marker entirely.
+    //
+    // Whatever walls a page reports must be drawable on it. The count varies,
+    // because walls are read off the ledger — what must not vary is that none is
     // reported outside the frame that is meant to contain it.
     it('never reports a wall its own frame would drop', () => {
       const now = at(21 + 17, 12);

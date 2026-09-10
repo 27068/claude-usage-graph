@@ -122,6 +122,10 @@ describe('CredentialReader', () => {
     assert.deepStrictEqual(logger.warns, [], 'an absent file is normal, not a warning');
   });
 
+  // `validPayload` carries no `refreshTokenExpiresAt`, so this is also the case
+  // where Claude Code has not written that field: absent must read as renewable.
+  // Guessing "signed out" here would put a sign-in prompt in front of somebody
+  // who is signed in; guessing this way costs one CLI start that finds nothing.
   it('reports an expired token without attempting anything else', async () => {
     const { reader } = readerFor(store(validPayload(NOW - HOUR)));
     const result = await reader.read();
@@ -137,14 +141,6 @@ describe('CredentialReader', () => {
 
     const dead = readerFor(store(withRefreshExpiry(NOW - HOUR, NOW - HOUR)));
     assert.strictEqual((await dead.reader.read()).state, 'signed-out');
-  });
-
-  it('treats an absent refresh expiry as renewable', async () => {
-    // Claude Code has not always written the field. Guessing "signed out" here
-    // would put a sign-in prompt in front of someone who is signed in; guessing
-    // the other way costs one CLI start that finds nothing to do.
-    const { reader } = readerFor(store(validPayload(NOW - HOUR)));
-    assert.strictEqual((await reader.read()).state, 'stale');
   });
 
   it('renews early enough to finish before Claude Code would start', () => {

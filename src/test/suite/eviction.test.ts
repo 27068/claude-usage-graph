@@ -28,9 +28,9 @@ const DAY = 86_400_000;
  * count of days.
  *
  * A test that hardcodes "40 days is stale" is really asserting what the default
- * retention happens to be, and it fails the day that moves — which it has, from
- * 30 to 365. `STALE` and `EVEN_STALER` say what they mean instead: old enough to
- * go, and one file older still where a test needs two in order.
+ * retention happens to be, and breaks whenever that setting moves. `STALE` and
+ * `EVEN_STALER` say what they mean instead: old enough to go, and one file older
+ * still where a test needs two in order.
  */
 const STALE = RETENTION_MS + 10 * DAY;
 const EVEN_STALER = STALE + DAY;
@@ -188,8 +188,8 @@ describe('Evictor', () => {
   });
 
   // A damaged file is set aside under a name `list` cannot see, so this sweep is
-  // the only thing that will ever clear it. Before it existed they accumulated
-  // for the life of the install.
+  // the only thing that can ever clear it. Without it they accumulate for the
+  // life of the install.
   it('deletes a quarantined file once it is past the cutoff', async () => {
     const stale = `${toFileName(NOW)}.corrupt-${NOW - STALE}`;
     await fs.writeFile(path.join(root, 'sessions', stale), 'wreckage', 'utf8');
@@ -218,17 +218,6 @@ describe('Evictor', () => {
     assert.strictEqual(left.length, 1, 'set aside for recovery, not destroyed');
     assert.ok(left[0].includes('.corrupt-'), left[0]);
     assert.strictEqual(logger.errors.length, 1, 'and it says so');
-  });
-
-  it('leaves a corrupt but recent file where it can be found', async () => {
-    const name = toFileName(NOW - DAY);
-    await fs.writeFile(path.join(root, 'sessions', name), 'not json at all', 'utf8');
-
-    await evict();
-
-    const left = await fs.readdir(path.join(root, 'sessions'));
-    assert.strictEqual(left.length, 1);
-    assert.ok(left[0].includes('.corrupt-'));
   });
 
   it('ignores files that are not ours', async () => {

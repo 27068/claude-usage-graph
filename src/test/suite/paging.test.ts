@@ -144,9 +144,9 @@ describe('paging', () => {
 
   // A session that begins at 00:00:29 carries the *same* name as midnight,
   // because the name is truncated to the minute. So the name alone cannot say
-  // which day it belongs to, and a rule that answered with the name — which is
-  // what `fromFileName` did, and why it was deleted — would have a coin flip
-  // here. The header says 29 seconds past midnight, so it is today's.
+  // which day it belongs to: decoding a day back out of a filename is a coin
+  // flip here, which is why nothing does it. The header says 29 seconds past
+  // midnight, so it is today's.
   it('files a session by its start, not by a name it shares with midnight', async () => {
     const day = startOfLocalDay(NOW);
     const early = day + 29_000;

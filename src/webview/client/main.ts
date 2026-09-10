@@ -622,10 +622,10 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 // `pageshow` fires after that restore, so this is the last word on the toggles.
 //
 // Building the boxes in script rather than serving them ought to make this moot:
-// restoration matches controls parsed from the markup, and these are not. Kept
-// because it costs one pass over a handful of checkboxes, and because the shell
-// having *no* toggles in it now means a regression here would be silent — the
-// row would simply come back all-ticked and start drawing hidden series again.
+// restoration matches controls parsed from the markup, and these are not. It
+// stays because it costs one pass over a handful of checkboxes, and because the
+// shell carries no toggles of its own, so a failure here is silent — the row
+// simply comes back all-ticked and starts drawing hidden series again.
 window.addEventListener('pageshow', syncToggleChecks);
 
 // Restore the saved page *before* asking for data, so the first frame lands on

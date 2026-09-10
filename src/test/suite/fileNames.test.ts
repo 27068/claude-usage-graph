@@ -60,8 +60,7 @@ describe('namesForStartRange', () => {
    * The property the whole design rests on, asserted as the property rather
    * than as an example: every file that *started* in the range must be among
    * the candidates, whatever second of whatever minute it started on. Miss one
-   * and a session vanishes from its own day, which is exactly the class of bug
-   * that had `fromFileName` deleted.
+   * and a session vanishes from its own day, with nothing anywhere to say so.
    */
   it('never misses a file whose start is inside the range', () => {
     const starts = [0, 1, 59_999, 60_000, 30 * 60_000 + 17, HOUR - 1, HOUR + 500].map(

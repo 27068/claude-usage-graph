@@ -98,20 +98,14 @@ describe('mock harness (end to end)', () => {
     );
   });
 
-  it('breaks the line where the value moved while we were away', () => {
+  // Exactly one, which is two claims in one count. The fixture moves the value
+  // across a gap once, so a break is owed there; it then idles 77 minutes at 41%,
+  // so if elapsed time alone could break a line there would be a second null.
+  it('breaks the line only where the value moved while we were away', () => {
     const first = sessions[0];
     const breaks = first.samples.filter((sample) => sample[1] === null);
 
-    assert.strictEqual(breaks.length, 1, 'exactly one dead zone in the first session');
-  });
-
-  it('does NOT break the line across the long stretch where nothing moved', () => {
-    // The fixture idles 77 minutes at 41% after the break. If elapsed time alone
-    // could trigger a dead zone, this session would carry a second null.
-    const first = sessions[0];
-    const nulls = first.samples.filter((sample) => sample[1] === null).length;
-
-    assert.strictEqual(nulls, 1, 'idleness must not manufacture a second break');
+    assert.strictEqual(breaks.length, 1, 'one dead zone, and idleness adds none');
   });
 
   it('compresses the idle stretches instead of storing every tick', () => {

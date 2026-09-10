@@ -54,12 +54,12 @@ describe('architecture', () => {
     assert.deepStrictEqual(offenders, []);
   });
 
-  // The auth layer was asserted read-only outright until it had to renew. What
-  // follows is narrower and covers the same ground, because each of these three
-  // shapes turns a renewal into a silent sign-out: the credential looks healthy
-  // for as long as nobody spends it, so the damage surfaces minutes later,
-  // somewhere else, with nothing to connect it back. That delay is what no other
-  // test can catch, and the reason these are asserted rather than reviewed for.
+  // The auth layer writes, so it cannot be asserted read-only outright. These
+  // three shapes are what a renewal must not take, because each turns one into a
+  // silent sign-out: the credential looks healthy for as long as nobody spends
+  // it, so the damage surfaces minutes later, somewhere else, with nothing to
+  // connect it back. That delay is what no other test can catch, and the reason
+  // these are asserted rather than reviewed for.
 
   it('keeps the credential reader itself read-only', () => {
     // Every poll goes through this file and only some go through the refresher,
@@ -119,7 +119,8 @@ describe('architecture', () => {
     // Assigning `html` starts the page loading, and the client posts `ready` as
     // soon as it is up. Registering the listener afterwards races that message;
     // losing it means `hydrate` never fires and the panel sits empty until the
-    // next poll. This shipped once — hence the guard.
+    // next poll. Nothing about the ordering is visible on screen, so it is
+    // asserted here rather than trusted to review.
     const source = fs.readFileSync(path.join(ROOT, 'src/vscode/dashboardPanel.ts'), 'utf8');
     const listener = source.indexOf('onDidReceiveMessage');
     const html = source.indexOf('webview.html =');

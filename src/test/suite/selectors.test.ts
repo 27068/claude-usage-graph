@@ -198,11 +198,6 @@ describe('selectPoolDay', () => {
     assert.strictEqual(view.empty, false, 'but the ledger is not empty');
   });
 
-  it('reports empty only when no session has ever been recorded', () => {
-    assert.strictEqual(selectPoolDay([], NOW, NOW, 0).empty, true);
-    assert.strictEqual(selectPoolDay([session(at(1, 9))], NOW, NOW, 0).empty, false);
-  });
-
   it('gives an empty day a usable frame rather than a degenerate axis', () => {
     const view = selectPoolDay([], NOW, NOW, 0);
 
@@ -344,13 +339,6 @@ describe('selectCalendarWeek', () => {
     }
   });
 
-  it('leaves the opening edge unmarked when nothing recorded that boundary', () => {
-    const view = selectCalendarWeek(weeks, NOW, 0);
-
-    assert.strictEqual(view.resets.length, 1, 'only the boundary the ledger holds');
-    assert.ok(view.resets.every((reset) => reset.at !== RESET - WEEK_MS));
-  });
-
   it('pages back exactly one week per offset', () => {
     const view = selectCalendarWeek(weeks, NOW, 2);
 
@@ -371,9 +359,10 @@ describe('selectCalendarWeek', () => {
   });
 
   it('splits each column into its own series', () => {
-    // The trailing 2 is a fourth value written before `extra_usage` was dropped.
-    // Columns are read positionally, so an old row still maps onto the current
-    // series without a migration — the surplus slot is simply never read.
+    // The trailing 2 stands for a column this build charts nothing for, which is
+    // what any file written by another build can carry. Columns are read
+    // positionally, so such a row still maps onto the current series without a
+    // migration — the surplus slot is simply never read.
     const view = selectCalendarWeek(
       [week(at(14, 9), RESET, [[at(15, 10), 14, 39, 7, 2]])],
       NOW,
@@ -410,14 +399,6 @@ describe('selectCalendarWeek', () => {
     assert.deepStrictEqual(historical.resets, [], 'no fallback once you page back');
   });
 
-  it('prefers the recorded wall over the projection when the frame holds one', () => {
-    const view = selectCalendarWeek(weeks, NOW, 0);
-
-    assert.strictEqual(view.resets.length, 1);
-    assert.ok(view.resets[0].label.startsWith('Reset '), view.resets[0].label);
-    assert.ok(!view.resets[0].label.includes('Expected'), 'this one was measured');
-  });
-
   // The recorded boundary goes stale the moment it passes. Anchoring there put
   // Now off the right-hand edge, where charts.ts drops the marker.
   it('rolls the anchor forward to the cycle running now', () => {
@@ -429,12 +410,6 @@ describe('selectCalendarWeek', () => {
     assert.strictEqual(view.resetAt, RESET + 3 * WEEK_MS);
     assert.ok(view.domain[0] <= away && away <= view.domain[1], 'Now must be inside the live frame');
     assert.strictEqual(view.empty, false, 'a projected cycle is framed, not blanked');
-  });
-
-  it('leaves the anchor alone while the recorded cycle is still running', () => {
-    const view = selectCalendarWeek(weeks, NOW, 0);
-
-    assert.strictEqual(view.resetAt, RESET);
   });
 
   // A boundary landing exactly on now has just closed a cycle; the live one runs

@@ -45,13 +45,6 @@ describe('normalizeSnapshot', () => {
     );
   });
 
-  it('treats a null window as present-but-empty rather than throwing', () => {
-    const snapshot = normalizeSnapshot(LIVE_PAYLOAD, AT);
-
-    const opus = snapshot.models.find((model) => model.key === 'seven_day_opus');
-    assert.deepStrictEqual(opus?.window, { utilization: null, resetsAt: null });
-  });
-
   it('ignores the extra-usage block, which is credits rather than a window', () => {
     const snapshot = normalizeSnapshot(LIVE_PAYLOAD, AT);
 
@@ -85,10 +78,11 @@ describe('normalizeSnapshot', () => {
     }
   });
 
-  // Observed live: the endpoint returned resets_at values 755ms apart for the
-  // same window on consecutive polls. Because that instant identifies the
-  // window — naming its file and deciding when to roll onto a new one — jitter
-  // across a minute boundary split one session into two files.
+  // The endpoint reports `resets_at` for one window with sub-second jitter,
+  // around three quarters of a second between consecutive polls. That instant
+  // identifies the window — it names the file and decides when to roll onto a
+  // new one — so jitter across a minute boundary splits one session into two
+  // files unless it is quantized away.
   it('quantizes reset boundaries so the same window keeps one identity', () => {
     const first = normalizeSnapshot(
       { five_hour: { utilization: 53, resets_at: '2026-09-01T14:59:59.717Z' } },
@@ -105,21 +99,6 @@ describe('normalizeSnapshot', () => {
       'sub-second jitter must not produce two different window identities',
     );
     assert.strictEqual(first.fiveHour.resetsAt as number, Date.parse('2026-09-01T15:00:00Z'));
-  });
-
-  it('quantizes the weekly boundary the same way', () => {
-    const a = normalizeSnapshot({ seven_day: { utilization: 9, resets_at: '2026-09-07T22:59:59.900Z' } }, AT);
-    const b = normalizeSnapshot({ seven_day: { utilization: 9, resets_at: '2026-09-07T23:00:00.100Z' } }, AT);
-    assert.strictEqual(a.sevenDay.resetsAt, b.sevenDay.resetsAt);
-  });
-
-  it('leaves a boundary that is already on the minute untouched', () => {
-    const exact = Date.parse('2026-02-06T22:00:00+00:00');
-    const snapshot = normalizeSnapshot(
-      { five_hour: { utilization: 1, resets_at: '2026-02-06T22:00:00+00:00' } },
-      AT,
-    );
-    assert.strictEqual(snapshot.fiveHour.resetsAt, exact);
   });
 
   it('accepts a zero utilization as a real value, not a missing one', () => {
