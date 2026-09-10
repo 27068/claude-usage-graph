@@ -2,19 +2,15 @@
 
 ## 1.1.0
 
-- **An expired access token now renews itself.** Tracking used to stop until you
-  next used Claude Code, so a machine left alone overnight came back to a hole
-  where the night should have been. The token is renewed directly and the poll
-  retried in the same tick, which means renewing now writes to the credential
-  store rather than only reading it. A refusal leaves that file exactly as it
-  was. The three situations behind the old warning are still told apart: a token
-  gone stale after a few hours away is not a fault and is not coloured as one,
-  being offline no longer asks you to sign in, and a credential the usage
-  endpoint refuses stays its own error because renewing cannot fix it. A renewal
-  that is actually refused now says so and is coloured, rather than looking like
-  an ordinary wait. On macOS
-  the credential lives in the keychain rather than a file, so renewal there is
-  still Claude Code's job and a long gap can still leave one in the graph.
+- **The extension now renews the access token.** Previously, once the access
+  token expired, the graph stopped updating until you next used Claude Code.
+  - If a renewal fails, the status bar shows a warning.
+  - Renewing writes to the Claude Code credential file, something earlier
+    versions avoided as a general precaution, but in this new update, writing
+    has been thoroughly investigated and tested, and stays clear of Claude
+    Code's own renewal.
+  - None of this applies on macOS, where the credential is in the keychain, so
+    the extension cannot modify it.
 - **Session Usage no longer goes blank at midnight.** A session belongs to the
   day it started, so a session opened late last night stays on last night's
   page. The view now follows it there until it resets, rather than moving to

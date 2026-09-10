@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import * as assert from 'assert';
-import {
-  CLAUDE_CODE_REFRESH_BAND_MS,
-  CredentialReader,
-  EXPIRY_SKEW_MS,
-} from '../../auth/credentialReader';
-import { POLL_INTERVAL_MS } from '../../core/usageEngine';
+import { CredentialReader } from '../../auth/credentialReader';
+import { EXPIRY_SKEW_MS, TOKEN_UNUSABLE_MS } from '../../core/tokenTiming';
 import { FakeClock, RecordingLogger } from './helpers';
 
 const NOW = 1_770_400_800_000;
@@ -143,29 +139,28 @@ describe('CredentialReader', () => {
     assert.strictEqual((await dead.reader.read()).state, 'signed-out');
   });
 
-  it('renews early enough to finish before Claude Code would start', () => {
-    // The latest we can act is one interval after the window opens, and that
-    // must land before Claude Code's own pre-emptive band — otherwise both of us
-    // redeem the same refresh token, and a server that treats reuse as theft
-    // signs the user out. Moving the interval or the band without moving the
-    // skew reintroduces that silently, which is the only reason this is asserted
-    // rather than left to the comment beside the constant.
-    const latestRenewal = EXPIRY_SKEW_MS - POLL_INTERVAL_MS;
+  it('keeps handing the token out while renewal is already overdue', async () => {
+    // The point of splitting the two thresholds. Renewal opens nine minutes
+    // before expiry and can fail for all of them; refusing the credential over
+    // that would blind the poll for the whole stretch, over a token the server
+    // is still perfectly willing to accept.
+    const { reader } = readerFor(store(validPayload(NOW + EXPIRY_SKEW_MS - 1)));
 
-    assert.ok(
-      latestRenewal > CLAUDE_CODE_REFRESH_BAND_MS,
-      `worst-case renewal is ${latestRenewal}ms before expiry, inside Claude Code's ` +
-        `${CLAUDE_CODE_REFRESH_BAND_MS}ms band`,
-    );
+    const result = await reader.read();
+
+    assert.strictEqual(result.state, 'ok');
+    assert.ok(result.state === 'ok' && result.token.length > 0, 'and it carries the token');
   });
 
-  it('treats a token inside the skew window as already expired', async () => {
-    const { reader } = readerFor(store(validPayload(NOW + EXPIRY_SKEW_MS - 1)));
+  it('stops handing the token out a minute before it expires', async () => {
+    // A request started later than this could still be in flight when the token
+    // dies, which is the only thing this threshold was ever about.
+    const { reader } = readerFor(store(validPayload(NOW + TOKEN_UNUSABLE_MS - 1)));
     assert.strictEqual((await reader.read()).state, 'stale');
   });
 
-  it('accepts a token just outside the skew window', async () => {
-    const { reader } = readerFor(store(validPayload(NOW + EXPIRY_SKEW_MS + 1000)));
+  it('accepts a token just outside that', async () => {
+    const { reader } = readerFor(store(validPayload(NOW + TOKEN_UNUSABLE_MS + 1000)));
     assert.strictEqual((await reader.read()).state, 'ok');
   });
 

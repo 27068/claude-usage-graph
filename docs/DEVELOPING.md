@@ -327,7 +327,9 @@ distribution rather than on merits. `DECISIONS.md` section 1 has the numbers.
 | `ledgerCache.ts` | The live window of each kind, plus the patch of what has moved. Not a mirror: history is paged from storage. |
 | `fileNames.ts` | UTC filename encode/decode, and the bounds that turn a directory listing into an interval index. Identity and sort order, never a data source. |
 | `eviction.ts` | Drops files whose `resetAt` is past the retention window, sweeps quarantined ones, and clamps the setting. A budgeted pass at a time, so a large sweep never blocks a tick. |
-| `pollSchedule.ts` | Cross-window shared deadline, so one window polls per turn. |
+| `pollSchedule.ts` | Cross-window shared deadline, so one window polls per turn. Also carries a second, unrelated hold saying who is redeeming the refresh token. |
+| `tokenRenewer.ts` | Keeps the access token alive on a clock of its own, quite separate from the polling cadence. Sleeps most of the day; retries on a short ladder when a redemption fails. |
+| `tokenTiming.ts` | When renewal may act and when the token may still be used, as offsets back from its expiry. Pure arithmetic, so the relationships between the constants are asserted rather than described. |
 | `mutex.ts` | Promise-chain mutex serialising writes. |
 | `atomicWrite.ts` | Temp-file-plus-rename, with Windows contention retries. |
 | `clock.ts` | `SystemClock`, and `ScenarioClock` for the manual-testing rig (section 10). Injected so tests drive time deterministically. |
@@ -381,7 +383,8 @@ distribution rather than on merits. `DECISIONS.md` section 1 has the numbers.
 - **Two windows fighting, or a corrupt write** — `core/pollSchedule.ts`,
   `core/atomicWrite.ts`.
 - **Auth, or "not signed in"** — `auth/credentialReader.ts`, `vscode/statusBar.ts`.
-- **A token that expired and did not come back** — `auth/credentialRefresher.ts`.
+- **A token that expired and did not come back** — `core/tokenRenewer.ts` for
+  when it tried, `auth/credentialRefresher.ts` for what happened when it did.
 - **Adding a command or setting** — `package.json` `contributes`, then
   `extension.ts` to wire it.
 

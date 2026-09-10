@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { CredentialResult, LedgerFile, LedgerKind, Millis, UsageSnapshot } from './types';
+import type {
+  CredentialResult,
+  LedgerFile,
+  LedgerKind,
+  Millis,
+  RefreshOutcome,
+  UsageSnapshot,
+} from './types';
 
 /**
  * Every abstraction the engine depends on lives here, so `core/` can be
@@ -51,8 +58,52 @@ export interface ICredentialStore {
  * Nothing here keeps such a copy, and nothing should.
  */
 export interface ICredentialRefresher {
-  /** True when the credential on disk reads back renewed. Never throws. */
-  refresh(): Promise<boolean>;
+  /**
+   * Redeem the refresh token once. Never throws.
+   *
+   * Says what happened rather than whether it worked, because the caller has to
+   * decide between coming back in fifteen seconds and coming back in half an
+   * hour, and only this end can tell those apart.
+   */
+  refresh(): Promise<RefreshOutcome>;
+}
+
+/**
+ * Keeps the access token alive on its own clock.
+ *
+ * Deliberately not the engine's job. The two run on unrelated schedules — one
+ * paces requests to a usage endpoint, the other counts down to a token expiry —
+ * and an earlier design that shared a deadline between them made every retry
+ * cost a usage request and put the ladder in a fight with the poll backoff.
+ *
+ * So this owns a timer, sleeps most of the day, and publishes no status. The
+ * engine only ever asks it a question.
+ */
+export interface ITokenRenewer extends IDisposable {
+  /**
+   * Begin. `onRenewed` fires after a renewal lands, so a poll blocked on the
+   * old token does not have to wait out its interval to notice.
+   */
+  start(onRenewed: () => void): void;
+
+  /**
+   * Whether the last attempt was refused.
+   *
+   * The engine asks when a poll comes back on an expired token, because an
+   * expiry nobody was renewing and one a renewal was refused for are a wait and
+   * a fault, and they must not share a colour.
+   */
+  isFailing(): boolean;
+
+  /**
+   * Check in from the poll tick.
+   *
+   * Renewal is invisible from outside: it can stop while polling carries on and
+   * nothing on screen would say so. This re-arms a timer that has been lost and
+   * does no renewal work of its own, the same way the engine hands the evictor a
+   * pass without waiting on it.
+   */
+  nudge(): void;
 }
 
 /** Throws `PollError` on any failure; never returns a partial snapshot. */

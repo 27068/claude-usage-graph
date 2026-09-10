@@ -167,6 +167,31 @@ export type CredentialResult =
   | { state: 'unreadable' }
   | { state: 'malformed'; reason: string };
 
+/**
+ * What came of one redemption attempt.
+ *
+ * The split that matters is `retry` against `cooldown`, and it is the whole
+ * reason this is not a boolean. A ladder that retries everything turns one
+ * refusal into seven requests in five minutes; a ladder that retries nothing
+ * cannot recover from the short network failure it exists for.
+ *
+ * `retry` is reserved for a failure that says nothing about the grant — no
+ * reply, or a server that is temporarily failing. Everything else waits, whether
+ * it is a refusal, an answer that could not be read, or a failure *after* the
+ * token was already written. That last group matters most: the refresh token has
+ * been spent by then, so trying again would present a dead one.
+ */
+export type RefreshOutcome =
+  /** The store reads back renewed, and expires at this instant. */
+  | { state: 'renewed'; expiresAt: Millis }
+  /** Nothing was spent and nothing is known; the next rung may as well try. */
+  | { state: 'retry'; reason: string }
+  /**
+   * Wait. `retryAfterMs` is the server's own figure where it gave one, and it
+   * only ever lengthens the wait — the cooldown is the floor.
+   */
+  | { state: 'cooldown'; reason: string; retryAfterMs?: number };
+
 /** Everything the webview needs that is not a ledger row. */
 export interface Meta {
   now: Millis;

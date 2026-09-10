@@ -33,6 +33,10 @@ import type { Millis } from './types';
  * advances its next-fire time and releases immediately, rather than holding the
  * lock for the duration of the job.
  *
+ * The file also carries a second, unrelated hold: who is redeeming the refresh
+ * token. It shares the file and the mutex and nothing else — see
+ * `claimRenewal`.
+ *
  * The file is still named `poll.lease`, because renaming it would strand a file
  * in the global storage of every existing install to no one's benefit.
  */
@@ -79,6 +83,10 @@ interface ScheduleState {
    * the endpoint's bad mood with a clean slate and starts the ladder again.
    */
   failures: number;
+  /** Whoever is redeeming the refresh token. Null when nobody is. */
+  renewer: string | null;
+  /** Set while that redemption is in flight; cleared by `releaseRenewal`. */
+  renewingSince: Millis | null;
 }
 
 export interface PollClaim {
@@ -139,6 +147,8 @@ export class PollSchedule {
         pollingSince: now,
         nextDueAt: now + this.intervalMs,
         failures,
+        renewer: current?.renewer ?? null,
+        renewingSince: current?.renewingSince ?? null,
       };
 
       try {
@@ -182,7 +192,14 @@ export class PollSchedule {
         return;
       }
       try {
-        await this.write({ owner: this.owner, pollingSince: null, nextDueAt, failures });
+        await this.write({
+          owner: this.owner,
+          pollingSince: null,
+          nextDueAt,
+          failures,
+          renewer: current?.renewer ?? null,
+          renewingSince: current?.renewingSince ?? null,
+        });
       } catch (error) {
         // The provisional deadline from `claim` is still on disk, so the cost of
         // losing this write is one mistimed wake-up, not a stuck schedule.
@@ -213,6 +230,80 @@ export class PollSchedule {
     });
   }
 
+  /**
+   * Claim the right to redeem the refresh token. True if it is ours.
+   *
+   * A second hold with its own field, and **not** the poll claim above. Sharing
+   * one would be smaller and is wrong: a window's poll and its renewal run under
+   * the same owner id, so the guard cannot tell them apart, and a poll settling
+   * in the middle of a redemption would clear the mark and let another window
+   * redeem the same refresh token alongside it. That is the one outcome the
+   * whole timing model exists to prevent.
+   *
+   * So this touches neither `pollingSince` nor `nextDueAt`. Renewal cannot delay
+   * a poll and a poll cannot interrupt a renewal.
+   *
+   * There is no deadline here, only exclusion. When to renew is derived from the
+   * token's own expiry, which every window reads off the same credential — see
+   * `core/tokenTiming.ts`. Nothing has to be agreed.
+   *
+   * `POLL_GUARD_MS` covers this as well: a redemption is one request against the
+   * same 30s timeout, and a window that dies mid-redemption releases it by
+   * ageing out.
+   */
+  async claimRenewal(): Promise<boolean> {
+    return this.mutex.runExclusive(async () => {
+      const now = this.clock.now();
+      const current = await this.read();
+
+      if (current !== undefined && current.renewer !== null && current.renewer !== this.owner) {
+        const since = current.renewingSince;
+        if (since !== null && now - since < POLL_GUARD_MS) {
+          return false;
+        }
+      }
+
+      const base: ScheduleState = current ?? {
+        owner: this.owner,
+        pollingSince: null,
+        nextDueAt: now,
+        failures: 0,
+        renewer: null,
+        renewingSince: null,
+      };
+
+      try {
+        await this.write({ ...base, renewer: this.owner, renewingSince: now });
+      } catch (error) {
+        this.logger.info(`Could not claim a renewal turn: ${String(error)}`);
+        return false;
+      }
+
+      // Same read-back as the poll claim, for the same reason: two windows can
+      // find the field free and both write, and the loser must stand down rather
+      // than redeem alongside the winner.
+      const confirmed = await this.read();
+      return confirmed?.renewer === this.owner;
+    });
+  }
+
+  /** Stand down from a renewal turn. Leaves the poll schedule alone. */
+  async releaseRenewal(): Promise<void> {
+    await this.mutex.runExclusive(async () => {
+      const current = await this.read();
+      if (current?.renewer !== this.owner) {
+        return;
+      }
+      try {
+        await this.write({ ...current, renewer: null, renewingSince: null });
+      } catch (error) {
+        // The guard ages out on its own, so the cost is a delayed retry rather
+        // than a stuck one.
+        this.logger.info(`Could not release the renewal turn: ${String(error)}`);
+      }
+    });
+  }
+
   private async read(): Promise<ScheduleState | undefined> {
     try {
       const parsed = JSON.parse(await fs.readFile(this.statePath, 'utf8')) as Partial<ScheduleState>;
@@ -227,6 +318,8 @@ export class PollSchedule {
         pollingSince: typeof parsed.pollingSince === 'number' ? parsed.pollingSince : null,
         nextDueAt: parsed.nextDueAt,
         failures: typeof parsed.failures === 'number' ? parsed.failures : 0,
+        renewer: typeof parsed.renewer === 'string' ? parsed.renewer : null,
+        renewingSince: typeof parsed.renewingSince === 'number' ? parsed.renewingSince : null,
       };
     } catch {
       // Missing or unreadable both mean "nobody demonstrably has a turn".

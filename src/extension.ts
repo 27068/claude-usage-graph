@@ -10,6 +10,7 @@ import { LedgerCache } from './core/ledgerCache';
 import { FileLedgerStorage } from './core/ledgerStorage';
 import { PollSchedule } from './core/pollSchedule';
 import { addLocalDays, startOfLocalDay } from './core/sessions';
+import { TokenRenewer } from './core/tokenRenewer';
 import { POLL_INTERVAL_MS, UsageEngine } from './core/usageEngine';
 import type { LedgerUpdatedEvent, Meta, StatusEvent } from './core/types';
 import { DashboardPanel, VIEW_TYPE } from './vscode/dashboardPanel';
@@ -95,17 +96,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const credentials = new CredentialReader(clock, logger);
   const poller = mockPoller ?? new HttpUsagePoller(credentials, clock, logger);
   /**
-   * Renewal is an HTTP call this extension makes, and **never a spawned CLI**:
-   * the CLI does not await its own credential write before exiting, and this
-   * host's `PATH` is short of what would otherwise delay it long enough. See
-   * `docs/DECISIONS.md` section 2.
+   * Keeps the access token alive on a clock of its own, quite separate from the
+   * polling cadence above — `core/tokenRenewer.ts` for why they must not share
+   * one. It redeems by HTTP and **never by spawning the CLI**: the CLI does not
+   * await its own credential write before exiting, and this host's `PATH` is
+   * short of what would otherwise delay it long enough. See `docs/DECISIONS.md`
+   * section 2.
    *
    * Absent on macOS, where the credential is in the keychain and this can read
-   * it but not write it. The engine then reports an expired token and waits,
-   * rather than announcing a renewal that is not coming.
+   * it but not write it, and absent in mock mode, where nothing should be able
+   * to touch a real credential at all. The engine then reports an expired token
+   * and waits, rather than announcing a renewal that is not coming.
    */
   const refresher =
-    process.platform === 'darwin' ? undefined : new CredentialRefresher(clock, logger);
+    process.platform === 'darwin' || useMock ? undefined : new CredentialRefresher(clock, logger);
+  const renewer =
+    refresher === undefined
+      ? undefined
+      : new TokenRenewer(credentials, refresher, schedule, clock, logger);
+
+  // Housekeeping, once per host, and deliberately not awaited: it clears temp
+  // files a failed rename left behind, whoever left them. Tying it to a renewal
+  // of our own would mean clearing another window's file only when this one
+  // happened to renew. See `sweepAbandoned`.
+  void refresher?.sweepAbandoned();
 
   if (useMock) {
     logger.info(`Running with synthetic fixture data (development mode, ${fixtureFile})`);
@@ -129,7 +143,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           .get<number>('retentionDays', RETENTION_DAYS),
       ),
     },
-    refresher,
+    renewer,
   );
 
   // Track the most recent meta and status so a panel opened later hydrates with

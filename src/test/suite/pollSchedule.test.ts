@@ -218,6 +218,83 @@ describe('PollSchedule', () => {
     );
   });
 
+  /**
+   * The second hold in the file, and the reason it is a second one.
+   *
+   * Renewal and polling are different critical sections that happen to share a
+   * file. Folding renewal into the poll claim is smaller and lets a poll settle
+   * in the middle of a redemption, which drops the mark and puts two windows on
+   * one refresh token — the outcome the whole timing model exists to prevent.
+   */
+  describe('the renewal hold', () => {
+    it('leaves the poll schedule exactly where it found it', async () => {
+      const a = windowNamed('window-a');
+      const b = windowNamed('window-b');
+
+      const claim = await a.claim();
+      await a.settle(clock.now() + INTERVAL, 0);
+
+      clock.advance(30_000);
+      assert.strictEqual(await a.claimRenewal(), true);
+
+      const after = await b.claim();
+      assert.strictEqual(after.dueAt, claim.dueAt, 'a redemption must not move the poll');
+      assert.strictEqual(after.granted, false, 'nor bring one forward');
+    });
+
+    it('survives a poll settling in the middle of it', async () => {
+      // The failure that decided the design. Both holds belong to one window
+      // under one owner id, so a shared mark cannot tell them apart.
+      const a = windowNamed('window-a');
+      const b = windowNamed('window-b');
+
+      assert.strictEqual(await a.claimRenewal(), true);
+      await a.claim({ force: true });
+      await a.settle(clock.now() + INTERVAL, 0);
+
+      assert.strictEqual(
+        await b.claimRenewal(),
+        false,
+        'the first window is still redeeming, whatever its poll did',
+      );
+    });
+
+    it('keeps a second window off a redemption in flight', async () => {
+      assert.strictEqual(await windowNamed('window-a').claimRenewal(), true);
+      assert.strictEqual(await windowNamed('window-b').claimRenewal(), false);
+    });
+
+    it('lets go without disturbing the poll deadline', async () => {
+      const a = windowNamed('window-a');
+      const claim = await a.claim();
+      await a.settle(claim.dueAt, 0);
+
+      assert.strictEqual(await a.claimRenewal(), true);
+      await a.releaseRenewal();
+
+      assert.strictEqual(await windowNamed('window-b').claimRenewal(), true);
+      assert.strictEqual((await windowNamed('window-b').claim()).dueAt, claim.dueAt);
+    });
+
+    it('takes over from a window that died mid-redemption', async () => {
+      assert.strictEqual(await windowNamed('window-a').claimRenewal(), true);
+
+      clock.advance(POLL_GUARD_MS);
+
+      assert.strictEqual(await windowNamed('window-b').claimRenewal(), true);
+    });
+
+    it('does not block a poll, and is not blocked by one', async () => {
+      // Two windows, each doing the other kind of work. Neither waits.
+      const a = windowNamed('window-a');
+      const b = windowNamed('window-b');
+
+      assert.strictEqual(await a.claimRenewal(), true);
+      assert.strictEqual((await b.claim()).granted, true, 'polling is unaffected');
+      assert.strictEqual(await a.claimRenewal(), true, 'and so is the redemption');
+    });
+  });
+
   it('treats a corrupt file as no schedule at all rather than jamming forever', async () => {
     await fs.writeFile(statePath(root), 'not json', 'utf8');
     assert.strictEqual((await windowNamed('window-a').claim()).granted, true);

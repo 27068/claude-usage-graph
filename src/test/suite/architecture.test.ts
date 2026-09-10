@@ -85,15 +85,20 @@ describe('architecture', () => {
 
     assert.deepStrictEqual(direct, [], `writes outside the temp file: ${direct.join(' / ')}`);
 
-    // One unlink is allowed and it is guarded by `written`: an empty temp file
-    // from a request that failed is not a credential and must not be left
-    // looking like one. Any other unlink is destroying the only copy of a grant
-    // that has already been spent.
-    const unlinks = contents.split('\n').filter((line) => /unlink/.test(line));
-    assert.strictEqual(unlinks.length, 1, `expected exactly one unlink, found ${unlinks.length}`);
+    // Two unlinks are allowed, and what matters is what guards each. An empty
+    // temp file from a failed request is not a credential and must not be left
+    // looking like one. An abandoned one *is* a credential, so it may only go
+    // once a renewal has landed and the store is known good. An unguarded unlink
+    // destroys the only copy of something the server has issued.
+    const unlinks = contents.split('\n').filter((line) => /fs\.unlink\(/.test(line));
+    assert.strictEqual(unlinks.length, 2, `expected exactly two unlinks, found ${unlinks.length}`);
     assert.ok(
       /if \(!written\) \{\s*\n\s*await fs\.unlink\(/.test(contents),
-      'the only unlink must be the one guarded by `written`',
+      'the empty temp file must only be removed under `written`',
+    );
+    assert.ok(
+      /ABANDONED_AFTER_MS\) \{\s*\n\s*continue;\s*\n\s*\}\s*\n\s*await fs\.unlink\(/.test(contents),
+      'the sweep must skip a temp file too recent to be abandoned',
     );
   });
 

@@ -85,9 +85,27 @@ incapable of writing means no ordinary tick can disturb a login.
 **Why the renewal is renamed into place rather than written onto the file.**
 Other processes read this file continuously, so a torn write leaves them parsing
 half a credential with nothing to fall back on. The temp file therefore *is* the
-write, and once a token is in it, it holds the only copy of a grant already
-spent — so a failure past that point keeps it and logs its path, and renaming it
-over `.credentials.json` is the recovery.
+write, and once a token is in it, it holds the only copy of a credential the
+server has already issued, so a failure past that point keeps it and logs its
+path.
+
+That is not a recovery route in practice. By the time anyone reads the log,
+Claude Code has presented the spent token, been refused, and blanked the store.
+
+**Clearing them is housekeeping over a shared directory, not a step of the
+renewal.** The files there belong to whoever left them, so hanging the sweep off
+the end of a redemption would tie clearing another window's file to this process
+happening to renew. It runs once per host instead, from the composition root,
+and is not awaited.
+
+Deleting one where the rename failed is not worth attempting either, because
+whatever stopped the rename is just as likely to stop the delete. A lock does not
+last, so the sweep runs later and a failed delete is met again next time. The
+process that left a file may well be the one that removes it.
+
+Without it they accumulate: a server that answers without rotating the refresh
+token leaves the old one working, so every attempt redeems, fails the same
+rename, and keeps another file.
 
 **Why the ordering in `refresh()` looks fussy.** The gap between the server
 issuing a pair and that pair reaching disk is the only interval where a crash
@@ -145,25 +163,55 @@ presenting a token the server has already retired.
 **Renewal is timed to finish before Claude Code would start.** Its token provider
 renews in the background once a token has under 120 seconds left, and
 synchronously under 30 — on use, never on a timer. That band is the only window
-where both of us can redeem the same refresh token at once, and a server that
-treats reuse as theft answers by revoking the family and signing the user out.
-So the reader's skew is one poll interval plus that band plus a minute of slack,
-and the arithmetic is asserted rather than described.
+where both of us can redeem the same refresh token at once. A server that
+invalidates a refresh token once it has been redeemed twice takes the whole chain
+with it, and the user is signed out. `core/tokenTiming.ts` holds the offsets that
+keep this extension outside that band, and the relationships between them are asserted rather than
+described, because none of them is visible from any one constant.
+
+**Two thresholds, not one.** When to start renewing and when to stop spending the
+token are different questions, and they shared a constant while both sat at a
+minute. Opening the renewal window to nine minutes with them still joined would
+refuse a credential the server is willing to accept, for every minute renewal
+kept failing.
+
+Kept apart, the window costs nothing, which is what makes a retry ladder
+possible at all. The reader owns the second half and knows nothing about the first.
+
+**Renewal runs on its own clock, not the engine's.** One timer that sleeps most
+of the day looks like something the poll tick could absorb, and sharing the
+poll's deadline is the obvious way to build it. There are two problems with it.
+
+Every retry would also make a usage request, seven of them in five minutes,
+against an endpoint that answers bursts with a 429. And the retries would grow
+further apart as the poll backed off, because a failing network fails both, and
+backing off is the opposite of what a retry ladder needs. `core/tokenRenewer.ts` has
+the two seams that remain between them.
+
+**Renewal takes its own hold on `poll.lease`, not the poll claim.** Reusing the
+claim is less code, and it lets two windows redeem the same refresh token at
+once. Both holds belong to
+one window under one owner id, so the guard cannot tell them apart, and a poll
+settling mid-redemption clears the flag while that redemption is still running.
 
 **Two things here cannot be tested without risking the thing being tested.**
 Neither is a reason to change anything; both are reasons not to be surprised.
 
-- **Refresh-token reuse detection.** If the server treats a spent token as theft
-  and revokes the whole family, a collision signs the user out. Standard practice
-  is a plain refusal, and concurrent redemptions have been observed not to
-  collide, which is consistent with a reuse grace window — but proving it means
-  presenting a spent token deliberately. The timing above exists so we never do.
+- **Refresh-token reuse detection.** A server may invalidate the whole chain
+  when a refresh token is redeemed a second time, in which case a collision
+  signs the user out. Standard practice is a plain refusal, and concurrent
+  redemptions have been observed not to collide, which is consistent with a
+  reuse grace window — but proving it means presenting a spent token
+  deliberately. The timing above exists so we never do.
 - **A timed-out request is "unknown", not "failed".** Aborting is client-side and
   does not stop the server processing the request, so a rotation may have
   happened that we never saw. The replacement is then lost and the file holds a
   retired token — the same outcome as the CLI bug, by a different route.
   Observed latency is 190–333 ms against a 30-second bound, so anything reaching
-  the timeout is already far outside normal.
+  the timeout is already far outside normal. It is retried anyway, on those same
+  figures: a reply that never arrives inside thirty seconds is a request that
+  almost certainly never landed. That is the one place the retry classification
+  guesses, and it guesses deliberately.
 
 **Predicting when this fires**, which is the only way to plan a test around it.
 An access token lasts eight hours from the moment it was issued, and nothing
