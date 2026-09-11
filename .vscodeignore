@@ -9,7 +9,6 @@ tsconfig.webview.json
 .gitignore
 .vscodeignore
 .node-version
-Requirements.md
 docs/**
 scripts/**
 CLAUDE.md
@@ -22,9 +21,5 @@ fixtures/scenarios/**
 # poll.lease ship inside the vsix.
 .vscode-test-host/**
 .vscode-screenshot-host/**
-
-# Auth investigation working directory. It holds copies of the real credential
-# file, so shipping it would publish live tokens.
-.auth-probe/**
 
 *.vsix
