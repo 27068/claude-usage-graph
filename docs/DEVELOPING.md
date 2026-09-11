@@ -762,6 +762,9 @@ The order, once; the reasoning for each part is below.
 6. Fast-forward `main` onto it and push both — `git push origin dev:main` then
    `git push origin v<x.y.z>`. A rejection here means `main` holds something
    `dev` does not, which is a question to answer rather than to `--force`.
+   `dev:main` is only the right source while the tag is still the tip of `dev`.
+   Once step 8 sits on top it would carry the `-dev` bump onto `main`, so push
+   the tag instead: `git push origin v<x.y.z>^{}:main`.
 7. Upload, by one of the two routes below.
 8. Bump straight away to the *next* version with a `-dev` suffix, so that no
    local build can be mistaken for the published one — section 5.
